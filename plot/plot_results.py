@@ -34,7 +34,9 @@ LBL = {
     "todma": "ToDMA (genie)",
     "masking_fixed4off": "Proposed (fixed load, off-load)",
     "masking_rich": "Proposed (fixed load)",
+    "masking_var_rich": "Proposed (variable load)",
     "oma_rich": "Re-encoded OMA",
+    "todma_rich": "ToDMA (genie)",
 }
 STYLE = {
     "masking_fixed": dict(color="#d95f02", marker="o", ls="-"),
@@ -44,7 +46,9 @@ STYLE = {
     "todma": dict(color="#7570b3", marker="d", ls="-."),
     "masking_fixed4off": dict(color="#d95f02", marker="x", ls=":"),
     "masking_rich": dict(color="#d95f02", marker="o", ls="-"),
+    "masking_var_rich": dict(color="#d95f02", marker="s", ls="--"),
     "oma_rich": dict(color="#1b5d99", marker="^", ls="-"),
+    "todma_rich": dict(color="#7570b3", marker="d", ls="-."),
 }
 
 rows = list(csv.DictReader(open(DATA)))
@@ -127,30 +131,42 @@ def snr_figure(name, series):
     guard_and_save(fig, ax, name, leg)
 
 
-# Fig: full load N=K=2
+def available(series):
+    """Keep only schemes whose rows exist, so the script runs before and
+    after a new experiment's CSV rows are merged."""
+    kept = [t for t in series if sel(*t)]
+    for t in series:
+        if t not in kept:
+            print("skipping (no data yet):", t)
+    return kept
+
+
+# Fig: full load N=K=2 (all four chains; ToDMA has no provisioned
+# population, so its K=2 rows are stored under designed=4)
 snr_figure("fig_snr_u2.pdf",
-           [("masking_fixed", 2, 2), ("oma", 2, 2), ("todma", 4, 2)])
+           available([("masking_fixed", 2, 2), ("masking_var", 2, 2),
+                      ("oma", 2, 2), ("todma", 4, 2)]))
 # Fig: overload N=K=4
 snr_figure("fig_snr_u4.pdf",
            [("masking_fixed", 4, 4), ("masking_var", 4, 4), ("oma", 4, 4), ("todma", 4, 4)])
 
-# Fig: underload PSNR vs K at 10 and 20 dB
+# Fig: underload PSNR vs K at 10 dB (one curve per scheme, canonical styles;
+# the 20 dB values are listed in the manuscript's load table instead)
 fig = plt.figure(); ax = fig.add_axes(AXRECT)
-for snr, lw, alpha in ((10, 1.4, 1.0), (20, 1.4, 0.55)):
-    for scheme in ("masking_var", "masking_fixed4off", "oma_static", "todma"):
-        d = [r for r in rows if r["scheme"] == scheme and r["snr"] == snr and r["designed"] == 4]
-        d = sorted(d, key=lambda r: r["active"])
-        st = dict(STYLE[scheme]); st["alpha"] = alpha
-        ax.plot([r["active"] for r in d], [r["psnr"] for r in d],
-                label=(LBL[scheme] if snr == 10 else None), lw=lw, **st)
+for scheme in ("masking_var", "masking_fixed4off", "oma_static", "todma"):
+    d = [r for r in rows if r["scheme"] == scheme and r["snr"] == 10 and r["designed"] == 4]
+    d = sorted(d, key=lambda r: r["active"])
+    ax.plot([r["active"] for r in d], [r["psnr"] for r in d],
+            label=LBL[scheme], **STYLE[scheme])
 ax.set_xlabel("Active users $K$ (provisioned $N=4$)"); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks([1, 2, 3, 4]); ax.grid(True, alpha=0.3)
 leg = place_legend(fig, ax)
 guard_and_save(fig, ax, "fig_underload.pdf", leg)
 
-# Fig: dimension-rich full load (L=32, N=K=2)
+# Fig: dimension-rich full load (L=32, N=K=2, all four chains)
 snr_figure("fig_snr_rich.pdf",
-           [("masking_rich", 2, 2), ("oma_rich", 2, 2)])
+           available([("masking_rich", 2, 2), ("masking_var_rich", 2, 2),
+                      ("oma_rich", 2, 2), ("todma_rich", 2, 2)]))
 
 # Fig: SINR model (Prop. 2) with the trained masks, vs K
 import csv as _csv
@@ -166,6 +182,16 @@ ax.set_xlabel("Active users $K$ (provisioned $N=4$)"); ax.set_ylabel("SINR (dB)"
 ax.set_xticks([1, 2, 3, 4]); ax.grid(True, alpha=0.3)
 leg = place_legend(fig, ax)
 guard_and_save(fig, ax, "fig_sinr_model.pdf", leg)
+
+# qualitative panels (Figs. 8-9): rendered by code/visual_eval.py on the GPU
+# host into data/visual/; this step installs the stored panels into fig/ so
+# one replot run refreshes every manuscript figure from data/ alone.
+import shutil
+for name in ("fig_visual_overload.pdf", "fig_visual_underload.pdf"):
+    src = os.path.join(ROOT, "data", "visual", name)
+    if os.path.exists(src):
+        shutil.copyfile(src, os.path.join(FIG, name))
+        print("installed", name)
 
 # trained-mask heatmaps: squared mask entries and overlap matrix (data/masks.csv)
 MASKS = os.path.join(ROOT, "data", "masks.csv")
@@ -185,7 +211,7 @@ if os.path.exists(MASKS):
     axm.set_xticklabels([str(i + 1) for i in range(L)])
     axm.set_title("$m_u^2(i)$", fontsize=9.5)
     im1 = axb.imshow(beta, cmap="viridis", aspect="auto", vmin=0)
-    axb.set_xlabel("user $v$")
+    axb.set_xlabel("user $v$"); axb.set_ylabel("user $u$")
     axb.set_xticks(range(U)); axb.set_yticks(range(U))
     axb.set_xticklabels([str(u + 1) for u in range(U)])
     axb.set_yticklabels([str(u + 1) for u in range(U)])
@@ -197,7 +223,7 @@ if os.path.exists(MASKS):
                      color="white" if beta[u][v] < 1.6 else "black")
     fig.colorbar(im0, ax=axm, fraction=0.046, pad=0.04)
     fig.colorbar(im1, ax=axb, fraction=0.046, pad=0.04)
-    fig.subplots_adjust(left=0.09, right=0.97, top=0.86, bottom=0.24, wspace=0.35)
+    fig.subplots_adjust(left=0.09, right=0.93, top=0.86, bottom=0.24, wspace=0.42)
     fig.savefig(os.path.join(FIG, "fig_masks.pdf"))
     plt.close(fig)
     print("wrote fig_masks.pdf")
@@ -223,6 +249,11 @@ with open(os.path.join(ROOT, "data", "quoted_numbers.md"), "w") as f:
         "var k1 20": ("masking_var", 4, 1, 20), "static oma20": ("oma", 4, 4, 20),
         "full2 mask20": ("masking_fixed", 2, 2, 20), "full2 oma20": ("oma", 2, 2, 20),
         "todma k3": ("todma", 4, 3, 10),
+        "u2 var": ("masking_var", 2, 2, 10), "u2 var20": ("masking_var", 2, 2, 20),
+        "rich mask": ("masking_rich", 2, 2, 10), "rich mask20": ("masking_rich", 2, 2, 20),
+        "rich var": ("masking_var_rich", 2, 2, 10), "rich var20": ("masking_var_rich", 2, 2, 20),
+        "rich oma": ("oma_rich", 2, 2, 10), "rich oma20": ("oma_rich", 2, 2, 20),
+        "rich todma": ("todma_rich", 2, 2, 10), "rich todma20": ("todma_rich", 2, 2, 20),
     }.items():
         f.write(f"- {tag}: {q(*args)}\n")
 print("done")

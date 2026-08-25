@@ -9,7 +9,7 @@ codewords on the shared dimensions and the receiver detects the active codewords
 import argparse, os, sys, time, random
 import torch, torch.nn.functional as F
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from swinsc import Config
 from swinsc.swin import SwinEncoder, SwinDecoder
 from swinsc.data import get_loader
@@ -24,7 +24,7 @@ p.add_argument("--bs", type=int, default=32)
 p.add_argument("--lr", type=float, default=3e-4)
 p.add_argument("--out", default=os.path.expanduser("~/ViT/checkpoints/todma_v256"))
 a = p.parse_args()
-dev = "cuda"
+dev = "cuda" if torch.cuda.is_available() else "cpu"
 cfg = Config(img_size=a.img_size, l_s=a.l_s, beta=1, users=1, mask_type="learned")
 
 

@@ -13,7 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from PIL import Image
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 from deepsc_ri.metrics import psnr
@@ -25,7 +25,7 @@ p.add_argument("--img_index", type=int, default=7, help="validation image offset
 p.add_argument("--out", default=os.path.expanduser("~/ViT/logs/visual"))
 a = p.parse_args()
 os.makedirs(a.out, exist_ok=True)
-dev = "cuda"
+dev = "cuda" if torch.cuda.is_available() else "cpu"
 CK = os.path.expanduser("~/ViT/checkpoints")
 random.seed(0); torch.manual_seed(0)
 val = sorted(glob.glob(os.path.expanduser("~/ViT/data/imagenette160/val/*/*.png")))

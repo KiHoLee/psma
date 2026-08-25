@@ -8,7 +8,7 @@ Saves tx.pt / rx.pt separately.
 import argparse, os, sys, time, random
 import torch, torch.nn.functional as F
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.data import get_loader
 from deepsc_ri.metrics import psnr

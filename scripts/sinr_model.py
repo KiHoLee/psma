@@ -6,7 +6,7 @@ of the variable-load model, averaged over Rayleigh fading by Monte Carlo.
 import argparse, os, sys, csv
 import torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 p = argparse.ArgumentParser()
 p.add_argument("--ckpt", default=os.path.expanduser("~/ViT/checkpoints/swinsc_ov_u4var_learned"))

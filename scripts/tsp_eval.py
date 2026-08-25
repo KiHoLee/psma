@@ -14,7 +14,7 @@ import argparse, os, sys, json, glob, random, csv
 import torch
 from PIL import Image
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 from deepsc_ri.metrics import psnr
@@ -25,7 +25,7 @@ p.add_argument("--snrs", type=float, nargs="+", default=[-5, 0, 5, 10, 15, 20])
 p.add_argument("--crop", type=int, default=128)
 p.add_argument("--out", default=os.path.expanduser("~/ViT/logs/tsp_eval.csv"))
 a = p.parse_args()
-dev = "cuda"
+dev = "cuda" if torch.cuda.is_available() else "cpu"
 random.seed(0); torch.manual_seed(0)
 CK = os.path.expanduser("~/ViT/checkpoints")
 val = sorted(glob.glob(os.path.expanduser("~/ViT/data/imagenette160/val/*/*.png")))
