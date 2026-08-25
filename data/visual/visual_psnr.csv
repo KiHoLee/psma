@@ -1,0 +1,15 @@
+panel,psnr_db,snr_db,channel_seed
+ov_fixed_img7,18.488,10.0,2026
+ov_var_img7,17.72,10.0,2026
+ov_oma_img7,15.041,10.0,2026
+ov_todma_img7,9.976,10.0,2026
+ul_k1_img7,18.898,10.0,2026
+ul_k2_img7,18.536,10.0,2026
+ul_todma1_img7,20.826,10.0,2026
+ov_fixed_img21,17.08,10.0,2026
+ov_var_img21,16.58,10.0,2026
+ov_oma_img21,14.756,10.0,2026
+ov_todma_img21,8.696,10.0,2026
+ul_k1_img21,17.467,10.0,2026
+ul_k2_img21,17.001,10.0,2026
+ul_todma1_img21,19.351,10.0,2026

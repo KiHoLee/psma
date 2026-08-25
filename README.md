@@ -1,8 +1,8 @@
 # Load-Adaptive Shared-Embedding Multiple Access — Reproducibility Package
 
 Code, raw results, and figures for the manuscript *"Load-Adaptive
-Mask-Based Multiple Access for Multi-User Semantic Image
-Communication"* (submitted to IEEE Transactions on Signal Processing).
+Mask-Based Multiple Access for Multi-User Semantic
+Communications"* (submitted to IEEE Transactions on Signal Processing).
 
 Mask-based superposition of Swin-transformer image embeddings with
 variable-load training, compared against re-encoded orthogonal
@@ -37,7 +37,12 @@ python scripts/todma_train.py --l_s 8 --v 256 --epochs 15   # ToDMA VQ autoencod
 # --- evaluation grid (writes data/tsp_eval.csv) ---
 python scripts/tsp_eval.py --out data/tsp_eval.csv
 
-# --- figures (reads only data/tsp_eval.csv, writes fig/*.pdf) ---
+# --- companion evaluations ---
+python scripts/sinr_model.py --out data/sinr_model.csv    # Prop.-2 model with trained masks (also dumps beta)
+python scripts/ssim_eval.py  --out data/ssim_eval.csv     # SSIM at the 10 dB point (Table VI)
+python scripts/visual_eval.py --out data/visual           # qualitative panels (Figs. 8-9)
+
+# --- figures (read only data/, write fig/*.pdf) ---
 python plot/plot_results.py
 ```
 
@@ -64,6 +69,11 @@ perfect-CSI zero forcing, training SNR Uniform[0, 20] dB, Adam
 | fig_snr_u2.pdf (full load, N=K=2) | plot/plot_results.py | data/tsp_eval.csv |
 | fig_snr_u4.pdf (overload, N=K=4) | plot/plot_results.py | data/tsp_eval.csv |
 | fig_underload.pdf (K=1..4 on N=4) | plot/plot_results.py | data/tsp_eval.csv |
+| fig_snr_rich.pdf (dimension-rich, L=32) | plot/plot_results.py | data/tsp_eval.csv |
+| fig_sinr_model.pdf (SINR model) | plot/plot_results.py | data/sinr_model.csv |
+| fig_masks.pdf (trained-mask heatmaps) | plot/plot_results.py | data/masks.csv |
+| fig_visual_overload.pdf / fig_visual_underload.pdf | scripts/visual_eval.py | data/visual/visual_psnr.csv |
+| Table VI (SSIM) | scripts/ssim_eval.py | data/ssim_eval.csv |
 
 `data/tsp_eval.csv` columns: `scheme, designed, active, snr, psnr`
 (mean per-user PSNR in dB over 200 validation images per user per

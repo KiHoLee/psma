@@ -1,0 +1,15 @@
+scheme,designed,active,snr,ssim
+masking_fixed,4,4,10,0.6119
+oma,4,4,10,0.4862
+masking_var,4,1,10,0.6536
+masking_var,4,2,10,0.6198
+masking_var,4,3,10,0.5974
+masking_var,4,4,10,0.5633
+oma_static,4,1,10,0.4862
+oma_static,4,2,10,0.4862
+oma_static,4,3,10,0.4862
+oma_static,4,4,10,0.4862
+todma,4,1,10,0.5458
+todma,4,2,10,0.1122
+todma,4,3,10,0.097
+todma,4,4,10,0.0907

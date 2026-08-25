@@ -1,0 +1,2 @@
+quantity,value_db,source
+todma_vq_clean_psnr,25.87,"final epoch of scripts/todma_train.py (V=256, l_s=8, seed 0); training log logs/todma_train.log on AINS"

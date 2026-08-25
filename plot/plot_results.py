@@ -33,6 +33,8 @@ LBL = {
     "oma_static": "Static OMA",
     "todma": "ToDMA (genie)",
     "masking_fixed4off": "Proposed (fixed load, off-load)",
+    "masking_rich": "Proposed (fixed load)",
+    "oma_rich": "Re-encoded OMA",
 }
 STYLE = {
     "masking_fixed": dict(color="#d95f02", marker="o", ls="-"),
@@ -41,6 +43,8 @@ STYLE = {
     "oma_static": dict(color="#1b5d99", marker="v", ls="--"),
     "todma": dict(color="#7570b3", marker="d", ls="-."),
     "masking_fixed4off": dict(color="#d95f02", marker="x", ls=":"),
+    "masking_rich": dict(color="#d95f02", marker="o", ls="-"),
+    "oma_rich": dict(color="#1b5d99", marker="^", ls="-"),
 }
 
 rows = list(csv.DictReader(open(DATA)))
@@ -112,10 +116,11 @@ def place_legend(fig, ax, **kw):
 
 def snr_figure(name, series):
     fig = plt.figure(); ax = fig.add_axes(AXRECT)
-    for scheme, designed, active in series:
+    for k, (scheme, designed, active) in enumerate(series):
         d = sel(scheme, designed, active)
+        # staggered markevery offsets so coinciding curves never stack markers (9.2)
         ax.plot([r["snr"] for r in d], [r["psnr"] for r in d],
-                label=LBL[scheme], **STYLE[scheme])
+                label=LBL[scheme], markevery=(k % 2, 2), **STYLE[scheme])
     ax.set_xlabel("SNR (dB)"); ax.set_ylabel("PSNR (dB)")
     ax.grid(True, alpha=0.3)
     leg = place_legend(fig, ax)
@@ -142,6 +147,60 @@ ax.set_xlabel("Active users $K$ (provisioned $N=4$)"); ax.set_ylabel("PSNR (dB)"
 ax.set_xticks([1, 2, 3, 4]); ax.grid(True, alpha=0.3)
 leg = place_legend(fig, ax)
 guard_and_save(fig, ax, "fig_underload.pdf", leg)
+
+# Fig: dimension-rich full load (L=32, N=K=2)
+snr_figure("fig_snr_rich.pdf",
+           [("masking_rich", 2, 2), ("oma_rich", 2, 2)])
+
+# Fig: SINR model (Prop. 2) with the trained masks, vs K
+import csv as _csv
+mrows = list(_csv.DictReader(open(os.path.join(ROOT, "data", "sinr_model.csv"))))
+fig = plt.figure(); ax = fig.add_axes(AXRECT)
+MCOL = {0: "#999999", 10: "#555555", 20: "#111111"}
+MMK = {0: "o", 10: "s", 20: "^"}
+for snr in (0, 10, 20):
+    d = sorted([r for r in mrows if int(r["snr"]) == snr], key=lambda r: int(r["active"]))
+    ax.plot([int(r["active"]) for r in d], [float(r["model_sinr_db"]) for r in d],
+            color=MCOL[snr], marker=MMK[snr], ls="-", label=f"Model, {snr} dB")
+ax.set_xlabel("Active users $K$ (provisioned $N=4$)"); ax.set_ylabel("SINR (dB)")
+ax.set_xticks([1, 2, 3, 4]); ax.grid(True, alpha=0.3)
+leg = place_legend(fig, ax)
+guard_and_save(fig, ax, "fig_sinr_model.pdf", leg)
+
+# trained-mask heatmaps: squared mask entries and overlap matrix (data/masks.csv)
+MASKS = os.path.join(ROOT, "data", "masks.csv")
+if os.path.exists(MASKS):
+    mrows = list(csv.DictReader(open(MASKS)))
+    U = len(mrows)
+    L = len([k for k in mrows[0] if k.startswith("m2_")])
+    M2 = [[float(mrows[u][f"m2_{i}"]) for i in range(L)] for u in range(U)]
+    beta = [[sum(M2[u][i] * M2[v][i] for i in range(L)) / L for v in range(U)]
+            for u in range(U)]
+    fig, (axm, axb) = plt.subplots(
+        1, 2, figsize=(4.0, 1.9), gridspec_kw={"width_ratios": [L, U]})
+    im0 = axm.imshow(M2, cmap="viridis", aspect="auto", vmin=0)
+    axm.set_xlabel("dimension $i$"); axm.set_ylabel("user $u$")
+    axm.set_xticks(range(L)); axm.set_yticks(range(U))
+    axm.set_yticklabels([str(u + 1) for u in range(U)])
+    axm.set_xticklabels([str(i + 1) for i in range(L)])
+    axm.set_title("$m_u^2(i)$", fontsize=9.5)
+    im1 = axb.imshow(beta, cmap="viridis", aspect="auto", vmin=0)
+    axb.set_xlabel("user $v$")
+    axb.set_xticks(range(U)); axb.set_yticks(range(U))
+    axb.set_xticklabels([str(u + 1) for u in range(U)])
+    axb.set_yticklabels([str(u + 1) for u in range(U)])
+    axb.set_title(r"$\beta_{uv}$", fontsize=9.5)
+    for u in range(U):
+        for v in range(U):
+            axb.text(v, u, f"{beta[u][v]:.1f}", ha="center", va="center",
+                     fontsize=7.5,
+                     color="white" if beta[u][v] < 1.6 else "black")
+    fig.colorbar(im0, ax=axm, fraction=0.046, pad=0.04)
+    fig.colorbar(im1, ax=axb, fraction=0.046, pad=0.04)
+    fig.subplots_adjust(left=0.09, right=0.97, top=0.86, bottom=0.24, wspace=0.35)
+    fig.savefig(os.path.join(FIG, "fig_masks.pdf"))
+    plt.close(fig)
+    print("wrote fig_masks.pdf")
 
 # quoted-numbers digest for the manuscript
 with open(os.path.join(ROOT, "data", "quoted_numbers.md"), "w") as f:
