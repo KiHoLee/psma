@@ -1,4 +1,4 @@
-"""Joint end-to-end training of the Swin multi-user semantic link with mask multiplexing.
+﻿"""Joint end-to-end training of the Swin multi-user semantic link with mask multiplexing.
 
 Each step draws one independent CIFAR10 image batch per user, multiplexes them on the shared
 embedding, passes the channel at a random SNR, and every user decodes its own image:
@@ -9,31 +9,34 @@ import argparse, os, sys, time, random
 import torch, torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_main import MAIN, l_s as MAIN_L_S, device as MAIN_DEVICE, wpath   # the ONE configuration (7.9)
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.data import get_loader
 from deepsc_ri.metrics import psnr
 
 p = argparse.ArgumentParser()
-p.add_argument("--dataset", default="imagenette", choices=["cifar", "imagenette"])
-p.add_argument("--img_size", type=int, default=128)
-p.add_argument("--stages", type=int, default=2, choices=[2, 3, 4], help="Swin stages: token = (2*2^(stages-1))^2 pixels")
-p.add_argument("--users", type=int, default=2)
+p.add_argument("--dataset", default=MAIN["DATASET"], choices=["cifar", "imagenette"])
+p.add_argument("--img_size", type=int, default=MAIN["CROP"])
+p.add_argument("--stages", type=int, default=MAIN["STAGES"], choices=[2, 3, 4], help="Swin stages: token = (2*2^(stages-1))^2 pixels")
+p.add_argument("--users", type=int, default=MAIN["N"][0])
 p.add_argument("--mask", default="learned", choices=["learned", "hadamard", "haar", "oma"])
-p.add_argument("--beta", type=int, default=2)
-p.add_argument("--l_s", type=int, default=64)
-p.add_argument("--channel", default="rayleigh", choices=["awgn", "rician", "rayleigh", "rayleigh_fs"])
-p.add_argument("--snr_min", type=float, default=0)
-p.add_argument("--snr_max", type=float, default=20)
-p.add_argument("--epochs", type=int, default=40)
-p.add_argument("--bs", type=int, default=32)
-p.add_argument("--lr", type=float, default=3e-4)
-p.add_argument("--out", default=os.path.expanduser("~/ViT/checkpoints/swinsc"))
+p.add_argument("--beta", type=int, default=MAIN["BETA"])
+p.add_argument("--l_s", type=int, default=MAIN_L_S(), help="L_s = L / beta; the manuscript's L is l_e")
+p.add_argument("--channel", default=MAIN["CHANNEL"], choices=["awgn", "rician", "rayleigh", "rayleigh_fs"])
+p.add_argument("--snr_min", type=float, default=MAIN["SNR_TRAIN"][0])
+p.add_argument("--snr_max", type=float, default=MAIN["SNR_TRAIN"][1])
+p.add_argument("--epochs", type=int, default=MAIN["EPOCHS"][0])
+p.add_argument("--bs", type=int, default=MAIN["BATCH"])
+p.add_argument("--lr", type=float, default=MAIN["LR"])
+p.add_argument("--seed", type=int, default=MAIN["SEED"])
+p.add_argument("--out", default=wpath("checkpoints", "swinsc"))
 p.add_argument("--resume", action="store_true")
 p.add_argument("--amp", action="store_true", help="bf16 autocast")
 p.add_argument("--var_load", action="store_true", help="train with a random number of ACTIVE users per step (underload-robust)")
 a = p.parse_args()
 
-dev = "cuda" if torch.cuda.is_available() else "cpu"
+random.seed(a.seed); torch.manual_seed(a.seed)
+dev = MAIN_DEVICE()
 ARCH = {2: ((96, 192), (2, 2), (3, 6)), 3: ((96, 192, 384), (2, 2, 2), (3, 6, 12)), 4: ((96, 192, 384, 768), (2, 2, 2, 2), (3, 6, 12, 24))}
 dims, depths, heads = ARCH[a.stages]
 cfg = Config(img_size=a.img_size if a.dataset == "imagenette" else 32, users=a.users, mask_type=a.mask, beta=a.beta, l_s=a.l_s, channel=a.channel,
@@ -51,7 +54,7 @@ for q in params:
         seen.add(id(q)); uniq.append(q)
 print(f"TX {sum(q.numel() for q in tx.parameters())/1e6:.2f}M  RX {sum(q.numel() for q in rx.parameters())/1e6:.2f}M  "
       f"users={cfg.users} mask={cfg.mask_type} L_s={cfg.l_s} L_e={cfg.l_e} stages={a.stages} (token={cfg.down}x{cfg.down}px, CBR={cfg.l_e/2/(cfg.down**2*3):.3f}) dataset={a.dataset} img={cfg.img_size}")
-opt = torch.optim.AdamW(uniq, a.lr, weight_decay=1e-4)
+opt = torch.optim.AdamW(uniq, a.lr, weight_decay=MAIN["WEIGHT_DECAY"])
 loaders = [get_loader(a.dataset, True, a.bs, cfg.img_size) for _ in range(cfg.users)]
 test = get_loader(a.dataset, False, 64, cfg.img_size)
 sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.epochs * len(loaders[0]))
@@ -78,7 +81,7 @@ for ep in range(start, a.epochs):
         outs, act = run(imgs, random.uniform(a.snr_min, a.snr_max), act)
         loss = sum(F.mse_loss(o, imgs[u]) for o, u in zip(outs, act)) / len(act)
         opt.zero_grad(set_to_none=True); loss.backward()
-        torch.nn.utils.clip_grad_norm_(uniq, 1.0); opt.step(); sched.step(); tot += loss.item()
+        torch.nn.utils.clip_grad_norm_(uniq, MAIN["GRAD_CLIP"]); opt.step(); sched.step(); tot += loss.item()
     tx.eval(); rx.eval(); ps = {s: [] for s in (0, 10, 20)}
     with torch.no_grad():
         for i, (x, _) in enumerate(test):

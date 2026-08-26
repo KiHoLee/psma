@@ -1,6 +1,6 @@
 """Download Imagenette (160px, 10 ImageNet classes, ~13k images) from the Hugging Face parquet
 mirror and export to ImageFolder layout:  data/imagenette160/{train,val}/<class>/*.png
-Also copies a few validation images into web/samples/ and the Windows dev folder (if given)."""
+Also copies a few validation images into web/samples/, and into --win_dir when one is given."""
 import argparse, io, os, sys, subprocess
 import pyarrow.parquet as pq
 from PIL import Image
@@ -13,7 +13,8 @@ URL = "https://huggingface.co/datasets/frgfm/imagenette/resolve/refs%2Fconvert%2
 p = argparse.ArgumentParser()
 p.add_argument("--out", default=os.path.join(ROOT, "data", "imagenette160"))
 p.add_argument("--samples", type=int, default=3, help="val images per class copied to web/samples")
-p.add_argument("--win_dir", default="/mnt/c/Users/kihol/Documents/개발/ViT_samples/imagenette")
+p.add_argument("--win_dir", default="",
+               help="optional extra directory to copy the sample images into")
 a = p.parse_args()
 
 pdir = os.path.join(ROOT, "data", "imagenette_parquet"); os.makedirs(pdir, exist_ok=True)

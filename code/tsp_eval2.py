@@ -4,15 +4,16 @@ Evaluates the N=2 variable-load model (L=8) and the retrained
 Rayleigh dimension-rich set (L=32: fixed, variable, OMA, ToDMA)
 with the same images, seeds, and channel conventions as tsp_eval.py.
 
-Writes ~/ViT/logs/tsp_eval2.csv: scheme,designed,active,snr,psnr
+Writes data/tsp_eval2_raw.csv: scheme,designed,active,snr,psnr
 
-    ~/tr_env/bin/python scripts/tsp_eval2.py
+    python code/tsp_eval2.py --out data/tsp_eval2_raw.csv
 """
 import argparse, os, sys, glob, random, csv
 import torch
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_main import MAIN, device as MAIN_DEVICE, wpath   # the ONE configuration (standard 7.9)
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 from deepsc_ri.metrics import psnr
@@ -21,12 +22,12 @@ p = argparse.ArgumentParser()
 p.add_argument("--n", type=int, default=200)
 p.add_argument("--snrs", type=float, nargs="+", default=[-5, 0, 5, 10, 15, 20])
 p.add_argument("--crop", type=int, default=128)
-p.add_argument("--out", default=os.path.expanduser("~/ViT/logs/tsp_eval2.csv"))
+p.add_argument("--out", default=wpath("data", "tsp_eval2.csv"))
 a = p.parse_args()
-dev = "cuda" if torch.cuda.is_available() else "cpu"
-random.seed(0); torch.manual_seed(0)
-CK = os.path.expanduser("~/ViT/checkpoints")
-val = sorted(glob.glob(os.path.expanduser("~/ViT/data/imagenette160/val/*/*.png")))
+dev = MAIN_DEVICE()
+random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+CK = wpath("checkpoints")
+val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
 
 
@@ -83,7 +84,7 @@ def eval_todma(ckpt, scheme, designed, actives):
                       tuple(reversed(cfgT.heads)), cfgT.window, D).to(dev).eval()
     enc.load_state_dict(st["enc"]); dec.load_state_dict(st["dec"])
     Cb = st["vq"]["codebook"].to(dev)
-    g = torch.Generator(device="cpu").manual_seed(2026)
+    g = torch.Generator(device="cpu").manual_seed(MAIN["SIGNATURE_SEED"])
     S = torch.randn(V, D, generator=g)
     S = (S / S.norm(dim=1, keepdim=True) * D ** 0.5).to(dev)
 

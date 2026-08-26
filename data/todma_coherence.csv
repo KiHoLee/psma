@@ -1,0 +1,3 @@
+dims,vocab,max_coherence,mean_abs_corr,welch_bound
+8,256,0.9738,0.2921,0.3487
+32,256,0.742,0.142,0.1657

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+checkpoints/
+data/imagenette160/
+data/quoted_numbers.md
+data/visual/fig_visual_*.pdf

@@ -1,10 +1,16 @@
 """Datasets for SwinSC training: CIFAR10 (32x32) or Imagenette-160 (random 128x128 crops)."""
 import os
+import sys
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-ROOT = os.path.expanduser("~/ViT/data")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config_main import wpath   # the ONE configuration (standard 7.9)
+
+#: Where the datasets live. Follows SWINSC_ROOT when it is set, and otherwise
+#: the repository's own data/ directory, so a fresh clone needs no editing.
+ROOT = wpath("data")
 
 
 def _loader(ds, bs, train, workers):

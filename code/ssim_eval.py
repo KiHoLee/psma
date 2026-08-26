@@ -1,9 +1,9 @@
 """SSIM companion metric for the TSP manuscript, 10 dB operating point only.
 
-Writes ~/ViT/logs/ssim_eval.csv: scheme,designed,active,snr,ssim
+Writes data/ssim_eval.csv: scheme,designed,active,snr,ssim
 Same models, images, seeds, and channel conventions as tsp_eval.py.
 
-    ~/tr_env/bin/python scripts/ssim_eval.py
+    python code/ssim_eval.py --out data/ssim_eval.csv
 """
 import argparse, os, sys, glob, random, csv
 import torch
@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_main import MAIN, device as MAIN_DEVICE, wpath   # the ONE configuration (standard 7.9)
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 
@@ -18,12 +19,12 @@ p = argparse.ArgumentParser()
 p.add_argument("--n", type=int, default=200)
 p.add_argument("--snr", type=float, default=10.0)
 p.add_argument("--crop", type=int, default=128)
-p.add_argument("--out", default=os.path.expanduser("~/ViT/logs/ssim_eval.csv"))
+p.add_argument("--out", default=wpath("data", "ssim_eval.csv"))
 a = p.parse_args()
-dev = "cuda" if torch.cuda.is_available() else "cpu"
-random.seed(0); torch.manual_seed(0)
-CK = os.path.expanduser("~/ViT/checkpoints")
-val = sorted(glob.glob(os.path.expanduser("~/ViT/data/imagenette160/val/*/*.png")))
+dev = MAIN_DEVICE()
+random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+CK = wpath("checkpoints")
+val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
 
 
@@ -100,7 +101,7 @@ dec = SwinDecoder(cfgT.in_ch, cfgT.patch, tuple(reversed(cfgT.dims)), tuple(reve
                   tuple(reversed(cfgT.heads)), cfgT.window, D).to(dev).eval()
 enc.load_state_dict(st["enc"]); dec.load_state_dict(st["dec"])
 Cb = st["vq"]["codebook"].to(dev)
-g = torch.Generator(device="cpu").manual_seed(2026)
+g = torch.Generator(device="cpu").manual_seed(MAIN["SIGNATURE_SEED"])
 S = torch.randn(V, D, generator=g)
 S = (S / S.norm(dim=1, keepdim=True) * D ** 0.5).to(dev)
 

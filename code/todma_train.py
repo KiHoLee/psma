@@ -4,27 +4,31 @@ Each Swin token is quantised to one of V codewords (dim L_e); the codeword vecto
 transmit signal. Multiple access is training-free (see todma_eval.py): users superpose their
 codewords on the shared dimensions and the receiver detects the active codewords by OMP.
 
-    python scripts/todma_train.py --l_s 8 --v 256 --epochs 15
+    python code/todma_train.py
 """
 import argparse, os, sys, time, random
 import torch, torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_main import MAIN, device as MAIN_DEVICE, wpath            # the ONE configuration (standard 7.9)
 from swinsc import Config
 from swinsc.swin import SwinEncoder, SwinDecoder
 from swinsc.data import get_loader
 from deepsc_ri.metrics import psnr
 
 p = argparse.ArgumentParser()
-p.add_argument("--l_s", type=int, default=8, help="codeword dim = transmitted reals per token")
-p.add_argument("--v", type=int, default=256, help="codebook size")
-p.add_argument("--img_size", type=int, default=128)
-p.add_argument("--epochs", type=int, default=15)
-p.add_argument("--bs", type=int, default=32)
-p.add_argument("--lr", type=float, default=3e-4)
-p.add_argument("--out", default=os.path.expanduser("~/ViT/checkpoints/todma_v256"))
+# beta = 1 here, so the codeword dim IS the manuscript's L
+p.add_argument("--l_s", type=int, default=MAIN["L"], help="codeword dim = transmitted reals per token")
+p.add_argument("--v", type=int, default=MAIN["VOCAB"], help="codebook size")
+p.add_argument("--img_size", type=int, default=MAIN["CROP"])
+p.add_argument("--epochs", type=int, default=MAIN["EPOCHS"][0])
+p.add_argument("--bs", type=int, default=MAIN["BATCH"])
+p.add_argument("--lr", type=float, default=MAIN["LR"])
+p.add_argument("--seed", type=int, default=MAIN["SEED"])
+p.add_argument("--out", default=wpath("checkpoints", "todma_v256"))
 a = p.parse_args()
-dev = "cuda" if torch.cuda.is_available() else "cpu"
+random.seed(a.seed); torch.manual_seed(a.seed)
+dev = MAIN_DEVICE()
 cfg = Config(img_size=a.img_size, l_s=a.l_s, beta=1, users=1, mask_type="learned")
 
 
@@ -48,8 +52,8 @@ dec = SwinDecoder(cfg.in_ch, cfg.patch, tuple(reversed(cfg.dims)), tuple(reverse
                   tuple(reversed(cfg.heads)), cfg.window, a.l_s).to(dev)
 vq = VQ(a.v, a.l_s).to(dev)
 params = list(enc.parameters()) + list(dec.parameters()) + list(vq.parameters())
-opt = torch.optim.AdamW(params, a.lr, weight_decay=1e-4)
-tr = get_loader("imagenette", True, a.bs, a.img_size)
+opt = torch.optim.AdamW(params, a.lr, weight_decay=MAIN["WEIGHT_DECAY"])
+tr = get_loader(MAIN["DATASET"], True, a.bs, a.img_size)
 te = get_loader("imagenette", False, 64, a.img_size)
 print(f"ToDMA VQ: V={a.v} d={a.l_s} enc {sum(q.numel() for q in enc.parameters())/1e6:.2f}M", flush=True)
 

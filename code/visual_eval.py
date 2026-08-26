@@ -4,7 +4,7 @@ Writes fig_visual_overload.pdf and fig_visual_underload.pdf plus a CSV of the
 per-panel PSNRs. Same channel realization (fixed seed) across schemes so the
 panels differ only by the access scheme.
 
-    ~/tr_env/bin/python scripts/visual_eval.py --out ~/ViT/logs/visual
+    python code/visual_eval.py --out data/visual
 """
 import argparse, os, sys, glob, random, csv
 import torch
@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config_main import MAIN, device as MAIN_DEVICE, wpath   # the ONE configuration (standard 7.9)
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 from deepsc_ri.metrics import psnr
@@ -22,13 +23,13 @@ p = argparse.ArgumentParser()
 p.add_argument("--crop", type=int, default=128)
 p.add_argument("--snr", type=float, default=10.0)
 p.add_argument("--img_index", type=int, default=7, help="validation image offset")
-p.add_argument("--out", default=os.path.expanduser("~/ViT/logs/visual"))
+p.add_argument("--out", default=wpath("data", "visual"))
 a = p.parse_args()
 os.makedirs(a.out, exist_ok=True)
-dev = "cuda" if torch.cuda.is_available() else "cpu"
-CK = os.path.expanduser("~/ViT/checkpoints")
-random.seed(0); torch.manual_seed(0)
-val = sorted(glob.glob(os.path.expanduser("~/ViT/data/imagenette160/val/*/*.png")))
+dev = MAIN_DEVICE()
+CK = wpath("checkpoints")
+random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
 
 
@@ -80,7 +81,7 @@ def run_todma(active):
                       tuple(reversed(cfg.heads)), cfg.window, D).to(dev).eval()
     enc.load_state_dict(st["enc"]); dec.load_state_dict(st["dec"])
     Cb = st["vq"]["codebook"].to(dev)
-    g = torch.Generator(device="cpu").manual_seed(2026)
+    g = torch.Generator(device="cpu").manual_seed(MAIN["SIGNATURE_SEED"])
     S = torch.randn(V, D, generator=g)
     S = (S / S.norm(dim=1, keepdim=True) * D ** 0.5).to(dev)
     K = len(active)
@@ -114,20 +115,36 @@ def run_todma(active):
     return out[0].cpu(), psnr(out, imgs[active[0]]).item()
 
 
+#: Panel geometry, in inches. Panels are square, so the canvas width follows the
+#: panel count: 10.25 in for the 5-panel overload figure, 12.30 in for the
+#: 6-panel underload one.
+PANEL_W, ROW_H = 2.05, 2.28
+#: Header size for a 6-panel canvas. Both figures are included at the same width
+#: in the manuscript, so a WIDER canvas is scaled down MORE, and a fixed font
+#: size would print smaller on the 6-panel figure than on the 5-panel one. That
+#: is exactly what happened at fontsize=11: 6.2 pt against 5.1 pt. Scaling the
+#: authored size by the canvas width cancels the scale factor, so both figures
+#: print their headers at HEADER_PT_6COL * W_include / (72 * 12.30). At the
+#: 0.80\textwidth include width the manuscript uses, that is 6.7 pt (9.6).
+HEADER_PT_6COL = 14.4
+
+
 def grid(rows2, fname):
     nrows, ncols = len(rows2), len(rows2[0])
-    fig, axes = plt.subplots(nrows, ncols, figsize=(2.05 * ncols, 2.28 * nrows))
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(PANEL_W * ncols, ROW_H * nrows))
+    header_pt = HEADER_PT_6COL * ncols / 6.0
     if nrows == 1:
         axes = [axes]
     flat = [ax for row in axes for ax in (row if hasattr(row, "__len__") else [row])]
     panels = [p for row in rows2 for p in row]
     for ax, (img, title) in zip(flat, panels):
         ax.imshow(img.clamp(0, 1).permute(1, 2, 0).numpy())
-        ax.set_title(title, fontsize=9)
+        ax.set_title(title, fontsize=header_pt)
         ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_linewidth(0.4)
-    fig.subplots_adjust(left=0.005, right=0.995, top=0.90 if nrows>1 else 0.86, bottom=0.02, wspace=0.04, hspace=0.22)
+    fig.subplots_adjust(left=0.005, right=0.995, top=0.855 if nrows>1 else 0.80, bottom=0.02, wspace=0.04, hspace=0.22)
     fig.savefig(os.path.join(a.out, fname))
     plt.close(fig)
     print("wrote", fname)
@@ -160,13 +177,13 @@ for idx in (7, 21):
         (r["ov_fixed"][0], cap("Proposed (fixed)", r["ov_fixed"][1], fr)),
         (r["ov_var"][0], cap("Proposed (variable)", r["ov_var"][1], fr)),
         (r["ov_oma"][0], cap("Re-encoded OMA", r["ov_oma"][1], fr)),
-        (r["ov_todma"][0], cap("ToDMA (genie)", r["ov_todma"][1], fr))])
+        (r["ov_todma"][0], cap("Token signatures\n(genie)", r["ov_todma"][1], fr))])
     rows_ul.append([(orig, "Original" if fr else ""),
         (r["ul_k1"][0], cap("Proposed, $K{=}1$", r["ul_k1"][1], fr)),
         (r["ul_k2"][0], cap("Proposed, $K{=}2$", r["ul_k2"][1], fr)),
         (r["ov_var"][0], cap("Proposed, $K{=}4$", r["ov_var"][1], fr)),
         (r["ov_oma"][0], cap("Static OMA, any $K$", r["ov_oma"][1], fr)),
-        (r["ul_todma1"][0], cap("ToDMA, $K{=}1$", r["ul_todma1"][1], fr))])
+        (r["ul_todma1"][0], cap("Token sig., $K{=}1$", r["ul_todma1"][1], fr))])
     for k, v in r.items():
         allres[f"{k}_img{idx}"] = v
 grid(rows_ov, "fig_visual_overload.pdf")
@@ -188,7 +205,7 @@ grid([(orig, "Original"),
       (res["ov_fixed"][0], f"Proposed (fixed)\n{res['ov_fixed'][1]:.1f} dB"),
       (res["ov_var"][0], f"Proposed (variable)\n{res['ov_var'][1]:.1f} dB"),
       (res["ov_oma"][0], f"Re-encoded OMA\n{res['ov_oma'][1]:.1f} dB"),
-      (res["ov_todma"][0], f"ToDMA (genie)\n{res['ov_todma'][1]:.1f} dB")],
+      (res["ov_todma"][0], f"Token signatures\n(genie)\n{res['ov_todma'][1]:.1f} dB")],
      "fig_visual_overload.pdf")
 
 res["ul_k1"] = run_masked("swinsc_ov_u4var_learned", [0])
@@ -201,7 +218,7 @@ grid([(orig, "Original"),
       (res["ul_k2"][0], f"Proposed, $K{{=}}2$\n{res['ul_k2'][1]:.1f} dB"),
       (res["ul_k4"][0], f"Proposed, $K{{=}}4$\n{res['ul_k4'][1]:.1f} dB"),
       (res["ul_oma"][0], f"Static OMA, any $K$\n{res['ul_oma'][1]:.1f} dB"),
-      (res["ul_todma1"][0], f"ToDMA, $K{{=}}1$\n{res['ul_todma1'][1]:.1f} dB")],
+      (res["ul_todma1"][0], f"Token sig., $K{{=}}1$\n{res['ul_todma1'][1]:.1f} dB")],
      "fig_visual_underload.pdf")
 
 with open(os.path.join(a.out, "visual_psnr.csv"), "w", newline="") as f:
