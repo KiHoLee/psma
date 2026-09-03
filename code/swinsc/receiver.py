@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from .config import Config
 from .swin import SwinDecoder
-from .mask_mux import UserMasks
+from .mask_mux import UserMasks, ProgressiveSpreader
 
 
 class Receiver(nn.Module):
@@ -19,12 +19,15 @@ class Receiver(nn.Module):
         self.cfg = cfg
         self.oma = cfg.mask_type == "oma"
         self.deepma = cfg.mask_type == "deepma"
+        self.prog = cfg.mask_type == "prog"
         self.lk = cfg.mask_type == "learned_k"
         in_dim = cfg.l_e // cfg.users if self.oma else cfg.l_e
         if self.oma:
             self.blk = in_dim                                  # OMA: slice own block, no mask
         elif self.deepma:
             pass                                               # DeepMA: own decoder reads the whole mixture
+        elif self.prog:
+            self.spreader = ProgressiveSpreader(cfg.l_e)       # despread own codes, zero-pad the prefix
         else:
             self.masks = UserMasks(cfg.users, cfg.l_e, cfg.mask_type, cfg.mask_seed)
         # A plain linear map, deliberately WITHOUT a LayerNorm in front of it. A
@@ -43,13 +46,19 @@ class Receiver(nn.Module):
             SwinDecoder(cfg.in_ch, cfg.patch, tuple(reversed(cfg.dims)), tuple(reversed(cfg.depths)),
                         tuple(reversed(cfg.heads)), cfg.window, cfg.l_s, n_loads=nl) for _ in range(cfg.users)])
 
-    def forward(self, z, u, hw, K=None):
+    def forward(self, z, u, hw, K=None, active=None):
         """K is the active count the receiver learns from the grant; only the
-        load-indexed mask family uses it, every other chain ignores it."""
+        load-indexed mask family uses it, every other chain ignores it. The
+        progressive-spread chain also needs the active list (its position in
+        it selects the codes); it defaults to the first K users."""
         if self.oma:
             z_u = z[:, :, u * self.blk:(u + 1) * self.blk]
         elif self.deepma:
             z_u = z
+        elif self.prog:
+            K = self.cfg.users if K is None else K
+            active = list(range(K)) if active is None else active
+            z_u = self.spreader.despread(z, active.index(u), K)
         else:
             z_u = self.masks.demux(z, u, K)
         dec = self.decoders[u]
@@ -63,6 +72,6 @@ class Receiver(nn.Module):
         """Only the tensors receiver `u` needs (mask + its own decoder)."""
         sd = self.state_dict()
         keep = {k: v for k, v in sd.items()
-                if k.startswith("masks.") or k.startswith(f"reduce.{u}.") or k.startswith(f"decoders.{u}.")
+                if k.startswith("masks.") or k.startswith("spreader.") or k.startswith(f"reduce.{u}.") or k.startswith(f"decoders.{u}.")
                 or (k.startswith("reduce_k.") and k.split(".")[2] == str(u))}
         return keep

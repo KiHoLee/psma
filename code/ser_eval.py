@@ -51,6 +51,8 @@ p.add_argument("--out", default=wpath("data", "ser_eval.csv"))
 p.add_argument("--skip_missing", action="store_true", help="skip chains whose checkpoint is absent")
 p.add_argument("--wh_only", action="store_true",
                help="evaluate only the clean floor and the dynamic WH chain (rows to be merged into ser_eval.csv)")
+p.add_argument("--prog_only", action="store_true",
+               help="evaluate only the clean floor and the progressive-spread prototype (research note)")
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
@@ -111,7 +113,7 @@ def pair(name):
 
 
 def eval_chain(name, scheme, designed, actives):
-    if a.wh_only:
+    if a.wh_only or (a.prog_only and scheme != "prog"):
         return
     pr = pair(name)
     if pr is None:
@@ -167,6 +169,11 @@ for K in (2, 4, 6, 8):
 # set like the masked chain's, so this is a physical evaluation of the N=4
 # pairs at K<4 (the DeepMA counterpart of "fixed load, off-load").
 eval_chain("swinsc_ov_u%d_deepma" % N0, "deepma_offload", N0, list(range(1, N0 + 1)))
+# Progressive-spread prototype (research note, 2026-09-03): one N=8 model,
+# prefix b_j(K) of an importance-ordered 8-symbol code on disjoint orthonormal
+# Walsh-Hadamard codes, evaluated at K = 1..8. Skipped when not trained.
+if os.path.exists(os.path.join(CK, "swinsc_ov_u8_prog", "tx.pt")):
+    eval_chain("swinsc_ov_u8_prog", "prog", 8, list(range(1, 9)))
 
 # ---- dynamic Walsh-Hadamard code allocation (author request, 2026-09-03) -----------
 # Code-domain orthogonal access with a pool of L_e length-L_e Walsh-Hadamard
@@ -192,7 +199,7 @@ def hadamard(n):
 
 L_E = MAIN["L"]
 Hn = hadamard(L_E).to(dev)
-for K in range(1, a.nmax + 1):
+for K in (range(1, a.nmax + 1) if not a.prog_only else []):
     Bc = 1 << ((L_E // K).bit_length() - 1)            # largest power of two <= L_e/K
     pr = pair("swinsc_ov_u%d_oma" % (L_E // Bc))
     if pr is None:
@@ -250,7 +257,7 @@ def omp(z, K):
     return torch.stack(picked, 1)
 
 
-for K in (range(1, a.nmax + 1) if not a.wh_only else []):
+for K in (range(1, a.nmax + 1) if not (a.wh_only or a.prog_only) else []):
     act = list(range(K))
     for s in a.snrs:
         ch = Channel("rayleigh", s)

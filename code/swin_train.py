@@ -19,7 +19,7 @@ p.add_argument("--dataset", default=MAIN["DATASET"], choices=["cifar", "imagenet
 p.add_argument("--img_size", type=int, default=MAIN["CROP"])
 p.add_argument("--stages", type=int, default=MAIN["STAGES"], choices=[2, 3, 4], help="Swin stages: token = (2*2^(stages-1))^2 pixels")
 p.add_argument("--users", type=int, default=MAIN["N"][0])
-p.add_argument("--mask", default="learned", choices=["learned", "learned_k", "hadamard", "haar", "oma", "deepma"])
+p.add_argument("--mask", default="learned", choices=["learned", "learned_k", "hadamard", "haar", "oma", "deepma", "prog"])
 p.add_argument("--beta", type=int, default=MAIN["BETA"])
 p.add_argument("--l_s", type=int, default=MAIN_L_S(), help="L_s = L / beta; the manuscript's L is l_e")
 p.add_argument("--channel", default=MAIN["CHANNEL"], choices=["awgn", "rician", "rayleigh", "rayleigh_fs"])
@@ -70,7 +70,7 @@ def run(imgs, snr, active=None):
     with torch.autocast("cuda", dtype=torch.bfloat16, enabled=a.amp):
         f, hw = tx([imgs[u] for u in active], active=active)
         z = ch(f.float(), snr)
-        outs = [rx(z, u, hw, K=len(active)).float() for u in active]
+        outs = [rx(z, u, hw, K=len(active), active=active).float() for u in active]
     return outs, active
 
 

@@ -105,3 +105,53 @@ def power_normalize(x):
     B = x.shape[0]
     p = x.reshape(B, -1).pow(2).mean(1, keepdim=True).sqrt().clamp_min(1e-8)
     return x / p.view(B, *([1] * (x.dim() - 1)))
+
+
+class ProgressiveSpreader(nn.Module):
+    """Progressive-spread multiple access (research prototype, 2026-09-03).
+
+    Why: a diagonal mask family cannot use every dimension AND stay
+    interference-free, because two masks with full support always overlap
+    (beta_uv > 0 unless the supports are disjoint), so the trained masks settle
+    on a partition and a lone user keeps only its own subset. Interference-free
+    full-band signatures need MIXING across dimensions, i.e. a signature MATRIX
+    per user rather than a diagonal one, and the source code must change its
+    rate with the load.
+
+    Design: the shared encoder emits L symbols per token ordered by importance.
+    At load K the j-th active user transmits only its first b_j symbols, with
+    b_j = floor(L/K) + [j < L mod K] so the K prefixes sum to L exactly (no idle
+    dimension at any K), and spreads them over the whole frame with b_j rows of
+    the orthonormal Walsh-Hadamard matrix (row c = code c), the users holding
+    disjoint code sets. Every user occupies all L dimensions, the K signature
+    sets are mutually orthogonal (zero interference for K <= L, so despreading
+    IS the LMMSE receiver), and a lone user gets the full L-symbol code.
+    Variable-load training makes the prefix length random, which is nested
+    dropout: the encoder learns an importance ordering and each decoder learns
+    to read any prefix (zero-padded to L). Both ends need only the active set,
+    exactly what the masked chain already assumes; no head switch, one model.
+    Loads K > L (non-orthogonal, tight-frame codes + LMMSE-IRC) are phase 2.
+    """
+
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+        self.register_buffer("Q", hadamard(dim) / math.sqrt(dim))   # orthonormal rows = codes
+
+    def prefixes(self, K):
+        L = self.dim
+        assert 1 <= K <= L, "phase 1 serves K <= L only"
+        b = [L // K + (1 if j < L % K else 0) for j in range(K)]
+        off = [sum(b[:j]) for j in range(K)]
+        return b, off
+
+    def spread(self, s, j, K):
+        """s: (B,N,L) ordered symbols of the j-th active user -> (B,N,L) frame contribution."""
+        b, off = self.prefixes(K)
+        return s[..., :b[j]] @ self.Q[off[j]:off[j] + b[j]]
+
+    def despread(self, z, j, K):
+        """(B,N,L) received frame -> (B,N,L) zero-padded prefix estimate of the j-th active user."""
+        b, off = self.prefixes(K)
+        y = z @ self.Q[off[j]:off[j] + b[j]].T
+        return torch.nn.functional.pad(y, (0, self.dim - b[j]))

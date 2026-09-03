@@ -114,6 +114,18 @@ ResNet-50 (ImageNet weights, logits restricted to the ten Imagenette
 classes) prediction differs from the label; the `clean` row is the
 classifier's error on the source crops.
 
+## Research prototype (not in the paper)
+
+`mask_type = "prog"` (`swinsc/mask_mux.py`, class `ProgressiveSpreader`) is a
+progressive-spread chain: the shared encoder emits eight importance-ordered
+symbols per token, the j-th active user at load K transmits the prefix
+b_j = floor(8/K) + [j < 8 mod K] on its own rows of the orthonormal
+Walsh-Hadamard matrix, and every user despreads with its rows (zero
+interference for K <= 8, no idle dimension at any K, one model). Trained with
+`swin_train.py --users 8 --mask prog --var_load`, evaluated with
+`ser_eval.py --prog_only`; raw rows in `data/ser_eval_prog_raw.csv`. The
+manuscript reports none of these numbers.
+
 ## Conventions
 
 - CBR = complex channel symbols / source values = L/96 for the 2-stage

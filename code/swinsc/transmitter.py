@@ -7,7 +7,7 @@ import torch.nn as nn
 
 from .config import Config
 from .swin import SwinEncoder
-from .mask_mux import UserMasks, Multiplexer, power_normalize
+from .mask_mux import UserMasks, Multiplexer, ProgressiveSpreader, power_normalize
 
 
 class Transmitter(nn.Module):
@@ -16,6 +16,7 @@ class Transmitter(nn.Module):
         self.cfg = cfg
         self.oma = cfg.mask_type == "oma"
         self.deepma = cfg.mask_type == "deepma"
+        self.prog = cfg.mask_type == "prog"
         if self.deepma:
             # DeepMA (Zhang et al., TCCN 2024) adapted to this frame: one INDEPENDENT
             # encoder-decoder pair per user, no masks and no codes. Every user's
@@ -46,6 +47,11 @@ class Transmitter(nn.Module):
             self.expands = nn.ModuleList([nn.Linear(cfg.l_s, cfg.l_e) for _ in range(cfg.users)])
             self.masks = UserMasks(cfg.users, cfg.l_e, cfg.mask_type, cfg.mask_seed)
             self.mux = Multiplexer(cfg.users)
+        elif self.prog:
+            # progressive-spread prototype: L ordered symbols per token, prefix
+            # b_j(K) spread over disjoint orthonormal Walsh-Hadamard codes
+            self.expand = nn.Linear(cfg.l_s, cfg.l_e)
+            self.spreader = ProgressiveSpreader(cfg.l_e)
         elif not self.deepma:
             self.expand = nn.Linear(cfg.l_s, cfg.l_e)      # L_e = beta * L_s
             self.masks = UserMasks(cfg.users, cfg.l_e, cfg.mask_type, cfg.mask_seed)
@@ -62,7 +68,7 @@ class Transmitter(nn.Module):
             K = self.cfg.users if K is None else K
             return self.masks.apply(self.expands[K - 1](s), u, K), hw
         e = self.expand(s)
-        return (e if self.oma else self.masks.apply(e, u, K)), hw
+        return (e if (self.oma or self.prog) else self.masks.apply(e, u, K)), hw
 
     def forward(self, imgs, active=None):
         """imgs: list of (B,3,H,W) tensors, one per active user (same H, W).
@@ -72,6 +78,10 @@ class Transmitter(nn.Module):
         for img, u in zip(imgs, active):
             e, hw = self.encode_user(img, u, K=len(active))
             es.append(e)
+        if self.prog:                                         # prefix b_j(K) of user j on its own codes
+            K = len(active)
+            f = sum(self.spreader.spread(e, j, K) for j, e in enumerate(es))
+            return power_normalize(f), hw
         if self.oma:                                          # resource partitioning: concat user blocks
             B, N, _ = es[0].shape
             f = es[0].new_zeros(B, N, self.cfg.l_e)
