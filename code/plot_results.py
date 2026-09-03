@@ -78,6 +78,9 @@ LBL = {
     "masking_var8": "Proposed (one model, $N{=}8$)",
     # re-encoded OMA retrained at the active count (the adaptive OMA of Table III)
     "oma_adaptive": "Adaptive OMA (retrained per $K$)",
+    # code-domain OMA with a pool of eight length-8 Walsh-Hadamard codes assigned
+    # at run time (8/K codes per user, idle-code power reused, OMA heads per code count)
+    "wh_dynamic": "Dynamic WH-OMA",
 }
 STYLE = {
     "masking_fixed": dict(color="#d95f02", marker="o", ls="-"),
@@ -106,6 +109,8 @@ STYLE = {
     "masking_var8": dict(color="#d95f02", marker="s", ls="--", mfc="none", mew=1.4),
     # adaptive OMA: OMA hue, up-triangle like re-encoded OMA, dotted for "retrained per K"
     "oma_adaptive": dict(color="#1b5d99", marker="^", ls=":"),
+    # dynamic WH-OMA: OMA hue, its own marker, dotted for "reallocated per K"
+    "wh_dynamic": dict(color="#1b5d99", marker="P", ls=":"),
 }
 
 rows = list(csv.DictReader(open(DATA)))
@@ -117,7 +122,7 @@ ser_rows = list(csv.DictReader(open(SER))) if os.path.exists(SER) else []
 for r in ser_rows:
     r["designed"] = int(r["designed"]); r["active"] = int(r["active"])
     r["snr"] = int(r["snr"]); r["psnr"] = float(r["psnr"]); r["ser"] = float(r["ser"])
-    if r["scheme"].startswith("deepma") or r["scheme"] == "masking_lk":
+    if r["scheme"].startswith("deepma") or r["scheme"] in ("masking_lk", "wh_dynamic"):
         rows.append({k: r[k] for k in ("scheme", "designed", "active", "snr", "psnr")})
 for r in rows:
     r["designed"] = int(r["designed"]); r["active"] = int(r["active"])
@@ -257,21 +262,27 @@ snr_figure("fig_snr_u4.pdf",
 
 # Fig: underload PSNR vs K at 10 dB (one curve per scheme, canonical styles;
 # the 20 dB values are listed in the manuscript's load table instead)
-fig = plt.figure(); ax = fig.add_axes(AXRECT)
-# adaptive OMA (retrained per K) is a reference, not a compared scheme: its
-# K = 1, 2 points go to Table V, and keeping it out of this figure keeps the
-# legend at five entries so the axes need no extension
-for scheme in ("masking_var", "masking_fixed4off", "oma_static", "deepma_offload", "todma"):
+# Six entries (dynamic WH-OMA added 2026-09-03) no longer fit inside the
+# axes without stretching the y axis to 40 dB for data that spans 10 to 26,
+# so this figure takes the wide-canvas, legend-below layout of the
+# throughput figure (same printed font size at 0.78 columnwidth).
+TW = 5.8
+fig = plt.figure(figsize=(TW, 3.0))
+ax = fig.add_axes([AXRECT[0] * 4.0 / TW, 0.445, 1.0 - 0.02 - AXRECT[0] * 4.0 / TW, 0.535])
+for scheme in ("masking_var", "masking_fixed4off", "oma_static", "wh_dynamic", "deepma_offload", "todma"):
     # active <= N_MAIN: the token-signature rows for K = 6, 8 also carry
-    # designed = N_MAIN (placeholder) and belong to the overload sweep below
+    # designed = N_MAIN (placeholder) and belong to the overload sweep below.
+    # Dynamic WH-OMA is filed under its code pool (designed = L), not under N_MAIN.
+    des = MAIN["L"] if scheme == "wh_dynamic" else N_MAIN
     d = [r for r in rows if r["scheme"] == scheme
-         and r["snr"] == SNR_OP and r["designed"] == N_MAIN and r["active"] <= N_MAIN]
+         and r["snr"] == SNR_OP and r["designed"] == des and r["active"] <= N_MAIN]
     d = sorted(d, key=lambda r: r["active"])
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d],
             label=LBL[scheme], **STYLE[scheme])
 ax.set_xlabel(XLABEL_LOAD); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks(LOADS); ax.grid(True, alpha=0.3)
-leg = place_legend(fig, ax)
+leg = ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.30), ncol=2,
+                bbox_transform=fig.transFigure, columnspacing=0.8)
 guard_and_save(fig, ax, "fig_underload.pdf", leg)
 
 # Fig: deep-overload sweep at FULL load, PSNR vs N = K at 10 dB. Each masked
@@ -284,6 +295,7 @@ fig = plt.figure(); ax = fig.add_axes(AXRECT)
 _series = (("masking_fixed", lambda r: r["designed"] == r["active"]),
            ("oma", lambda r: r["designed"] == r["active"]),
            ("deepma", lambda r: r["designed"] == r["active"]),
+           ("wh_dynamic", lambda r: r["designed"] == MAIN["L"]),
            ("todma", lambda r: r["designed"] == N_MAIN))
 _drawn = 0
 for scheme, cond in _series:
@@ -323,6 +335,7 @@ if ser_rows:
               ("oma_static", lambda K: tput("oma_static", N_MAIN, K, cap=N_MAIN), dict()),
               ("deepma_offload", lambda K: tput("deepma_offload", N_MAIN, K, cap=N_MAIN), dict()),
               ("oma", lambda K: tput("oma", K, K), dict(ls="none")),
+              ("wh_dynamic", lambda K: tput("wh_dynamic", MAIN["L"], K), dict()),
               ("todma", lambda K: tput("todma", N_MAIN, K), dict())]
     # Six long entries do not fit inside the axes of a 0.58-columnwidth print
     # without stretching the y axis to twice the data range, so this figure

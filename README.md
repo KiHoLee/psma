@@ -55,6 +55,8 @@ python code/tsp_eval2.py                                 # N = 2 variable-load a
 python code/tsp_eval3.py --offload                       # N = 6, 8 sweep and off-load rows -> tsp_eval3_raw.csv
 python code/merge_eval.py                                # merges the raw files into data/tsp_eval.csv
 python code/ser_eval.py   --out data/ser_eval.csv        # PSNR + semantic error rate, K = 1..8
+#   (--wh_only evaluates just the dynamic Walsh-Hadamard OMA chain, which
+#    reuses the swinsc_ov_u{1,2,4,8}_oma heads through an 8-code pool)
 python code/ssim_eval.py  --out data/ssim_eval.csv       # SSIM at 10 dB, N = 4
 python code/dump_artifacts.py                            # masks.csv, mux_weights.csv, param_counts.csv
 python code/sinr_model.py                                # data/sinr_model.csv from masks.csv
@@ -94,6 +96,7 @@ batch 24 per user, 20 epochs, seed 0.
 | `fig_underload.pdf` | K=1..4 on N=4 at 10 dB (Fig. 6) | `data/tsp_eval.csv`, `data/ser_eval.csv` (DeepMA off-load) |
 | `fig_throughput.pdf` | semantic throughput vs K=1..8 (Fig. 7) | `data/ser_eval.csv` |
 | `fig_overload_sweep.pdf` | PSNR vs N=K in {2,4,6,8} at 10 dB (Fig. 8) | `data/tsp_eval.csv`, `data/ser_eval.csv` |
+| (Figs. 6-8, Table V) | dynamic Walsh-Hadamard OMA rows (`scheme = wh_dynamic`) | `data/ser_eval.csv` (raw: `data/ser_eval_wh_raw.csv`) |
 | `fig_masks.pdf` | squared masks and overlap matrix (not in the paper) | `data/masks.csv` |
 | `fig_visual_*.pdf` | qualitative panels (not in the paper) | `data/visual/` |
 

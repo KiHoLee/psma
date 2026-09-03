@@ -18,6 +18,9 @@ Rows: scheme, designed, active, snr, psnr, ser, n_images
   oma            N=K in {2,4,8}                 re-encoded per load (B = L/N)
   oma_static     N=4 model, K = 1..4            static allocation; K > 4 is BLOCKED (no row)
   deepma         N=K in {2,4,6,8}, and the N=4 model at K = 1..4 (scheme deepma_static)
+  wh_dynamic     K = 1..8 (designed = 8 codes)  dynamic Walsh-Hadamard code allocation,
+                                                B = 8/K codes per user (largest power of two),
+                                                re-encoded OMA heads, idle-code power reused
   todma          K = 1..8                       token signatures (genie)
   clean          classifier on the source crops
 
@@ -32,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config_main import MAIN, device as MAIN_DEVICE, wpath   # the ONE configuration (standard 7.9)
 from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
+from swinsc.mask_mux import power_normalize
 from deepsc_ri.metrics import psnr
 
 CLASSES = ["tench", "English_springer", "cassette_player", "chain_saw", "church",
@@ -45,6 +49,8 @@ p.add_argument("--crop", type=int, default=MAIN["CROP"])
 p.add_argument("--nmax", type=int, default=8)
 p.add_argument("--out", default=wpath("data", "ser_eval.csv"))
 p.add_argument("--skip_missing", action="store_true", help="skip chains whose checkpoint is absent")
+p.add_argument("--wh_only", action="store_true",
+               help="evaluate only the clean floor and the dynamic WH chain (rows to be merged into ser_eval.csv)")
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
@@ -105,6 +111,8 @@ def pair(name):
 
 
 def eval_chain(name, scheme, designed, actives):
+    if a.wh_only:
+        return
     pr = pair(name)
     if pr is None:
         return
@@ -160,6 +168,59 @@ for K in (2, 4, 6, 8):
 # pairs at K<4 (the DeepMA counterpart of "fixed load, off-load").
 eval_chain("swinsc_ov_u%d_deepma" % N0, "deepma_offload", N0, list(range(1, N0 + 1)))
 
+# ---- dynamic Walsh-Hadamard code allocation (author request, 2026-09-03) -----------
+# Code-domain orthogonal access with a pool of L_e length-L_e Walsh-Hadamard
+# codes assigned at run time: K active users receive B = L_e/K codes each when
+# K divides L_e and the largest power of two below L_e/K otherwise (on L_e = 8:
+# K = 3 -> 2 codes, K = 5..7 -> 1 code), the codes left over stay idle, and the
+# frame is normalized over the ACTIVE codes so the idle-code power returns to
+# the active users (the receiver, which knows the grant, undoes that gain so
+# its decoder sees the scale it was trained at; the noise shrinks with it).
+# User u's B symbols per token ride its B codes and are despread by the same
+# orthonormal rows. The chain therefore needs the re-encoded OMA head trained
+# for its code count (checkpoints swinsc_ov_u{L_e/B}_oma, B in {8,4,2,1}).
+# Under a scalar block-fading gain with ZF and white noise the Hadamard matrix
+# is an orthonormal rotation of the block layout, so this is a physical
+# implementation of adaptive OMA (Table III) that also serves the populations
+# where N does not divide L, at reduced code efficiency K*B/L_e.
+def hadamard(n):
+    H = torch.ones(1, 1)
+    while H.shape[0] < n:
+        H = torch.cat([torch.cat([H, H], 1), torch.cat([H, -H], 1)], 0)
+    return H / n ** 0.5
+
+
+L_E = MAIN["L"]
+Hn = hadamard(L_E).to(dev)
+for K in range(1, a.nmax + 1):
+    Bc = 1 << ((L_E // K).bit_length() - 1)            # largest power of two <= L_e/K
+    pr = pair("swinsc_ov_u%d_oma" % (L_E // Bc))
+    if pr is None:
+        continue
+    cfg, tx, rx = pr
+    assert tx.blk == Bc, (tx.blk, Bc)
+    act = list(range(K))
+    scale = (K * Bc / L_E) ** 0.5
+    for s in a.snrs:
+        ch = Channel("rayleigh", s)
+        ps, errs = [], []
+        with torch.no_grad():
+            for b in range(0, a.n, 25):
+                xs = [imgs[u][b:b + 25].to(dev) for u in act]
+                f, hw = None, None
+                for j, u in enumerate(act):
+                    e, hw = tx.encode_user(xs[j], u)           # (B, N, Bc) symbols of user u
+                    if f is None:
+                        f = e.new_zeros(e.shape[0], e.shape[1], L_E)
+                    f[:, :, u * Bc:(u + 1) * Bc] = e            # symbol i of user u rides code u*Bc + i
+                f = power_normalize(f) @ Hn                     # spread (row j of H is code j)
+                z = ch(f) @ Hn.t() * scale                      # despread, undo the idle-code gain
+                for j, u in enumerate(act):
+                    out = rx(z, u, hw)
+                    ps.append(psnr(out, xs[j]).cpu())
+                    errs.append((predict(out).cpu() != labels[u][b:b + 25]))
+        record("wh_dynamic", L_E, K, s, ps, errs)
+
 # ---- token signatures (genie), same code path as tsp_eval.py ------------------------
 st = torch.load(os.path.join(CK, "todma_v256", "model.pt"), map_location=dev)
 cfgT = Config.load(os.path.join(CK, "todma_v256", "config.json"))
@@ -189,7 +250,7 @@ def omp(z, K):
     return torch.stack(picked, 1)
 
 
-for K in range(1, a.nmax + 1):
+for K in (range(1, a.nmax + 1) if not a.wh_only else []):
     act = list(range(K))
     for s in a.snrs:
         ch = Channel("rayleigh", s)
