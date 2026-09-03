@@ -113,7 +113,7 @@ def pair(name):
 
 
 def eval_chain(name, scheme, designed, actives):
-    if a.wh_only or (a.prog_only and scheme != "prog"):
+    if a.wh_only or (a.prog_only and not scheme.startswith(("prog", "psma"))):
         return
     pr = pair(name)
     if pr is None:
@@ -146,7 +146,7 @@ rows.append(["clean", 0, 0, 0, 99.0, round(torch.cat(errs).float().mean().item()
 print("clean classifier error on the source crops:", rows[-1][5], flush=True)
 
 # ---- learned chains ---------------------------------------------------------------
-N0 = MAIN["N"][-1]
+N0 = MAIN["N"][0]              # the main provisioned frame (4)
 eval_chain("swinsc_ov_u8var_learned", "masking_var", 8, list(range(1, 9)))
 eval_chain("swinsc_ov_u%dvar_learned" % N0, "masking_var", N0, list(range(1, N0 + 1)))
 for K in (2, 4, 6, 8):
@@ -173,7 +173,12 @@ eval_chain("swinsc_ov_u%d_deepma" % N0, "deepma_offload", N0, list(range(1, N0 +
 # prefix b_j(K) of an importance-ordered 8-symbol code on disjoint orthonormal
 # Walsh-Hadamard codes, evaluated at K = 1..8. Skipped when not trained.
 if os.path.exists(os.path.join(CK, "swinsc_ov_u8_prog", "tx.pt")):
-    eval_chain("swinsc_ov_u8_prog", "prog", 8, list(range(1, 9)))
+    eval_chain("swinsc_ov_u8_prog", "prog_v1", 8, list(range(1, 9)))
+# PSMA proper (2026-09-04): nested-dropout term (--multi_prefix) and prefix-length
+# conditioning of the decoders (--load_cond); one N=4 model and one N=8 model.
+for N in (4, 8):
+    if os.path.exists(os.path.join(CK, "swinsc_ov_u%d_psma" % N, "tx.pt")):
+        eval_chain("swinsc_ov_u%d_psma" % N, "psma", N, list(range(1, N + 1)))
 
 # ---- dynamic Walsh-Hadamard code allocation (author request, 2026-09-03) -----------
 # Code-domain orthogonal access with a pool of L_e length-L_e Walsh-Hadamard

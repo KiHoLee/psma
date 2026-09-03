@@ -29,8 +29,11 @@ class Transmitter(nn.Module):
             self.expands = nn.ModuleList([nn.Linear(cfg.l_s, cfg.l_e) for _ in range(cfg.users)])
             self.mux = Multiplexer(cfg.users, learn_weights=False)
         else:
+            # the progressive-spread encoder stays load-agnostic by design (one
+            # importance-ordered code for every load); conditioning applies to
+            # its decoders only (prefix length), see receiver.py
             self.encoder = SwinEncoder(cfg.in_ch, cfg.patch, cfg.dims, cfg.depths, cfg.heads, cfg.window, cfg.l_s,
-                                       n_loads=cfg.users if getattr(cfg, "load_cond", False) else None)
+                                       n_loads=cfg.users if (getattr(cfg, "load_cond", False) and not self.prog) else None)
         if self.oma:
             # OMA baseline: no masks, no superposition. Each user owns a disjoint L_e/U block of the frame.
             assert cfg.l_e % cfg.users == 0, "L_e must be divisible by the number of users for OMA"

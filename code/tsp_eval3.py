@@ -157,7 +157,7 @@ for K in a.loads:
 
 # ---------------- fixed-load model below its training load (Fig. 7 off-load curve) ----------------
 if a.offload:
-    N0 = MAIN["N"][-1]
+    N0 = MAIN["N"][0]
     eval_masked("swinsc_ov_u%d_learned" % N0, "masking_fixed4off", N0, list(range(1, N0 + 1)))
 
 with open(a.out, "w", newline="") as fo:

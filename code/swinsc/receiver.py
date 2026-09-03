@@ -41,7 +41,10 @@ class Receiver(nn.Module):
             # receiver-side counterpart of the per-K projection in the transmitter
             self.reduce_k = nn.ModuleList([nn.ModuleList([nn.Linear(in_dim, cfg.l_s) for _ in range(cfg.users)])
                                            for _ in range(cfg.users)])   # [K-1][u]
-        nl = cfg.users if getattr(cfg, "load_cond", False) else None
+        # load conditioning: the active count K for the mask families, the
+        # PREFIX LENGTH b in 1..L for the progressive-spread chain (its decoder
+        # reads a zero-padded prefix and is told how long it is)
+        nl = (cfg.l_e if self.prog else cfg.users) if getattr(cfg, "load_cond", False) else None
         self.decoders = nn.ModuleList([
             SwinDecoder(cfg.in_ch, cfg.patch, tuple(reversed(cfg.dims)), tuple(reversed(cfg.depths)),
                         tuple(reversed(cfg.heads)), cfg.window, cfg.l_s, n_loads=nl) for _ in range(cfg.users)])
@@ -58,7 +61,9 @@ class Receiver(nn.Module):
         elif self.prog:
             K = self.cfg.users if K is None else K
             active = list(range(K)) if active is None else active
-            z_u = self.spreader.despread(z, active.index(u), K)
+            j = active.index(u)
+            z_u = self.spreader.despread(z, j, K)
+            K = self.spreader.prefixes(K)[0][j]                # FiLM index = prefix length b_j
         else:
             z_u = self.masks.demux(z, u, K)
         dec = self.decoders[u]

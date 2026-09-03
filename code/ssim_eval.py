@@ -88,6 +88,8 @@ eval_masked("swinsc_ov_u4_learned", "masking_fixed", 4, [4])
 eval_masked("swinsc_ov_u4_oma", "oma", 4, [4])
 eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [4])
 eval_masked("swinsc_ov_u4var_learned", "masking_var", 4, [1, 2, 3, 4])
+if os.path.exists(os.path.join(CK, "swinsc_ov_u4_psma", "tx.pt")):     # PSMA (2026-09-04)
+    eval_masked("swinsc_ov_u4_psma", "psma", 4, [1, 2, 3, 4])
 for r in [r for r in rows if r[0] == "oma"]:
     for K in (1, 2, 3):
         rows.append(["oma_static", 4, K, r[3], r[4]])

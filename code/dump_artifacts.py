@@ -30,7 +30,7 @@ from swinsc.swin import SwinEncoder, SwinDecoder
 CK = wpath("checkpoints")
 OUT = wpath("data")
 os.makedirs(OUT, exist_ok=True)
-N = MAIN["N"][-1]
+N = MAIN["N"][0]
 VAR = "swinsc_ov_u%dvar_learned" % N
 
 
