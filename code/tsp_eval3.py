@@ -1,16 +1,23 @@
-"""Full evaluation grid for the TSP manuscript (paper 12).
+"""Deep-overload sweep at full load, N = K in {6, 8} (paper 12, Fig. 8).
 
-Produces ONE canonical CSV: scheme,designed,active,snr,psnr
-  masking_fixed  designed=U in {2,4}, active=U        (models trained at fixed load)
-  masking_var    designed=4, active K in {1..4}       (variable-load training)
-  oma            designed=U in {2,4}, active=U        (re-encoded OMA)
-  oma_static     designed=4, active K (flat: per-user quality independent of K)
-  todma          designed=4, active K in {1..4}       (signatures + OMP + genie association)
+Adds to the canonical grid the points the existing runs do not cover:
+  masking_fixed  designed=K, active=K   for K in (6, 8)   (models trained at that load)
+  oma            designed=8, active=8                     (re-encoded OMA, B = L/N = 1)
+  todma          designed=4, active=K   for K in (6, 8)   (no provisioned population;
+                                                           designed=4 is the placeholder
+                                                           the K<=4 rows already use)
+Re-encoded OMA has no N = 6 point because B = L/N must be an integer on the
+L = 8 frame, so the OMA curve of Fig. 8 runs over N in {2, 4, 8} only.
 
-Shared frame: L_e = 8 real dims per token (CBR 1/12), Rayleigh block fading, ZF, crop 128.
-Seeds fixed; n images per user per point.
+Same images, seeds, SNR grid and channel conventions as tsp_eval.py: users
+u = 0..7 read validation images u*n .. u*n+n-1, so users 0..3 see exactly
+the images of the earlier runs. Writes the raw rows to --out and MERGES them
+into data/tsp_eval.csv (replacing any row with the same scheme, designed,
+active, snr), so plot_results.py keeps reading one file.
+
+    python code/tsp_eval3.py --out data/tsp_eval3_raw.csv
 """
-import argparse, os, sys, json, glob, random, csv
+import argparse, os, sys, glob, random, csv
 import torch
 from PIL import Image
 
@@ -21,10 +28,16 @@ from swinsc.swin import SwinEncoder, SwinDecoder
 from deepsc_ri.metrics import psnr
 
 p = argparse.ArgumentParser()
-p.add_argument("--n", type=int, default=200)
-p.add_argument("--snrs", type=float, nargs="+", default=[-5, 0, 5, 10, 15, 20])
-p.add_argument("--crop", type=int, default=128)
-p.add_argument("--out", default=wpath("data", "tsp_eval.csv"))
+p.add_argument("--n", type=int, default=MAIN["VAL_IMAGES"])
+p.add_argument("--snrs", type=float, nargs="+", default=list(MAIN["SNR_GRID"]))
+p.add_argument("--crop", type=int, default=MAIN["CROP"])
+p.add_argument("--loads", type=int, nargs="+", default=[6, 8])
+p.add_argument("--offload", action="store_true",
+               help="also evaluate the N=4 fixed-load model BELOW its training load "
+                    "(rows masking_fixed4off, designed=4, active=1..4; the Fig. 7 off-load curve)")
+p.add_argument("--no_sweep", action="store_true", help="skip the N=K sweep and the token-signature rows")
+p.add_argument("--out", default=wpath("data", "tsp_eval3_raw.csv"))
+p.add_argument("--merge", default=wpath("data", "tsp_eval.csv"))
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
@@ -48,7 +61,9 @@ def pair(name):
 
 
 rows = []
-NMAX = 4
+if a.no_sweep:
+    a.loads = []
+NMAX = max(a.loads + [MAIN["N"][-1]])
 imgs = [torch.stack([load(val[(u * a.n + i) % len(val)]) for i in range(a.n)]) for u in range(NMAX)]
 
 
@@ -71,20 +86,18 @@ def eval_masked(name, scheme, designed, actives):
             print(scheme, designed, K, s, v, flush=True)
 
 
-eval_masked("swinsc_ov_u2_learned", "masking_fixed", 2, [2])
-eval_masked("swinsc_ov_u4_learned", "masking_fixed", 4, [4])
-eval_masked("swinsc_ov_u2_oma", "oma", 2, [2])
-eval_masked("swinsc_ov_u4_oma", "oma", 4, [4])
-eval_masked("swinsc_ov_u4var_learned", "masking_var", 4, [1, 2, 3, 4])
-# static OMA: flat in K, equal to the designed full-load figure (interference-free either way)
-oma_rows = [r for r in rows if r[0] == "oma" and r[1] == 4]
-for K in (1, 2, 3):
-    for r in oma_rows:
-        rows.append(["oma_static", 4, K, r[3], r[4]])
-for r in oma_rows:
-    rows.append(["oma_static", 4, 4, r[3], r[4]])
+for K in a.loads:
+    if os.path.isdir(os.path.join(CK, "swinsc_ov_u%d_learned" % K)):
+        eval_masked("swinsc_ov_u%d_learned" % K, "masking_fixed", K, [K])
+    else:
+        print("no masked model at N=%d; skipping" % K, flush=True)
+    oma_dir = os.path.join(CK, "swinsc_ov_u%d_oma" % K)
+    if os.path.isdir(oma_dir):
+        eval_masked("swinsc_ov_u%d_oma" % K, "oma", K, [K])
+    else:
+        print("no OMA model at N=%d (B = L/N is not an integer); skipping" % K, flush=True)
 
-# ---------------- ToDMA ----------------
+# ---------------- token signatures (genie), same code path as tsp_eval.py ----------------
 st = torch.load(os.path.join(CK, "todma_v256", "model.pt"), map_location=dev)
 cfgT = Config.load(os.path.join(CK, "todma_v256", "config.json"))
 V, D = st["v"], st["l_s"]
@@ -114,7 +127,7 @@ def omp(z, K):
     return torch.stack(picked, 1)
 
 
-for K in (1, 2, 3, 4):
+for K in a.loads:
     act = list(range(K))
     for s in a.snrs:
         ch = Channel("rayleigh", s)
@@ -142,6 +155,23 @@ for K in (1, 2, 3, 4):
         rows.append(["todma", 4, K, int(s), v])
         print("todma", 4, K, s, v, flush=True)
 
+# ---------------- fixed-load model below its training load (Fig. 7 off-load curve) ----------------
+if a.offload:
+    N0 = MAIN["N"][-1]
+    eval_masked("swinsc_ov_u%d_learned" % N0, "masking_fixed4off", N0, list(range(1, N0 + 1)))
+
 with open(a.out, "w", newline="") as fo:
     w = csv.writer(fo); w.writerow(["scheme", "designed", "active", "snr", "psnr"]); w.writerows(rows)
 print("saved", a.out, len(rows), "rows")
+
+# merge into the canonical grid, replacing rows with the same key
+if a.merge and os.path.exists(a.merge):
+    old = list(csv.DictReader(open(a.merge)))
+    key = lambda r: (r["scheme"], str(r["designed"]), str(r["active"]), str(r["snr"]))
+    new = {key(dict(zip(["scheme", "designed", "active", "snr", "psnr"], map(str, r)))): r for r in rows}
+    kept = [r for r in old if key(r) not in new]
+    with open(a.merge, "w", newline="") as fo:
+        w = csv.writer(fo); w.writerow(["scheme", "designed", "active", "snr", "psnr"])
+        w.writerows([[r["scheme"], r["designed"], r["active"], r["snr"], r["psnr"]] for r in kept])
+        w.writerows(rows)
+    print("merged into", a.merge, ": kept", len(kept), "+ new", len(rows))

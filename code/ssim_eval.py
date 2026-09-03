@@ -78,7 +78,7 @@ def eval_masked(name, scheme, designed, actives):
                 f, hw = tx(xs, active=act)
                 z = ch(f)
                 for j, u in enumerate(act):
-                    ps.append(ssim(rx(z, u, hw), xs[j]).cpu())
+                    ps.append(ssim(rx(z, u, hw, K=len(act)), xs[j]).cpu())
         v = round(torch.cat(ps).mean().item(), 4)
         rows.append([scheme, designed, K, int(a.snr), v])
         print(scheme, designed, K, v, flush=True)
@@ -86,6 +86,7 @@ def eval_masked(name, scheme, designed, actives):
 
 eval_masked("swinsc_ov_u4_learned", "masking_fixed", 4, [4])
 eval_masked("swinsc_ov_u4_oma", "oma", 4, [4])
+eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [4])
 eval_masked("swinsc_ov_u4var_learned", "masking_var", 4, [1, 2, 3, 4])
 for r in [r for r in rows if r[0] == "oma"]:
     for K in (1, 2, 3):

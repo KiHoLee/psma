@@ -63,7 +63,7 @@ def eval_masked(name, scheme, designed, actives):
                     f, hw = tx(xs, active=act)
                     z = ch(f)
                     for j, u in enumerate(act):
-                        ps.append(psnr(rx(z, u, hw), xs[j]).cpu())
+                        ps.append(psnr(rx(z, u, hw, K=len(act)), xs[j]).cpu())
             v = round(torch.cat(ps).mean().item(), 3)
             rows.append([scheme, designed, K, int(s), v])
             print(scheme, designed, K, s, v, flush=True)

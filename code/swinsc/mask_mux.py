@@ -42,6 +42,15 @@ class UserMasks(nn.Module):
         self.users, self.dim, self.mask_type = users, dim, mask_type
         if mask_type == "learned":
             self.W = nn.Parameter(torch.randn(users, dim) / math.sqrt(dim))
+        elif mask_type == "learned_k":
+            # Load-indexed masks (2026-09-03): one mask TABLE per active count K,
+            # W[K-1, u, :]. A single learned mask per user partitions the band
+            # (the trained N=4 masks concentrate on 2-3 of 8 dimensions), so a
+            # user left alone kept only its own subset and recovered power but
+            # not bandwidth. With a table the K=1 mask can span the whole
+            # frame and the K=N masks can partition it. The receiver already
+            # knows the active set, hence K, so no extra signaling is needed.
+            self.W = nn.Parameter(torch.randn(users, users, dim) / math.sqrt(dim))
         elif mask_type == "hadamard":
             H = hadamard(dim)
             self.register_buffer("W", H[1:users + 1])            # skip the all-ones row
@@ -51,22 +60,27 @@ class UserMasks(nn.Module):
         else:
             raise ValueError(mask_type)
 
-    def mask(self, u):
+    def mask(self, u, K=None):
+        """Mask of user u; K (active count) selects the table for learned_k and is ignored otherwise."""
         if self.mask_type == "haar":
             return self.W[u]
         if self.mask_type == "learned":
             w = self.W[u]
             return w / w.norm().clamp_min(1e-8) * math.sqrt(self.dim)   # unit average gain, as in SSE
+        if self.mask_type == "learned_k":
+            K = self.users if K is None else K
+            w = self.W[K - 1, u]
+            return w / w.norm().clamp_min(1e-8) * math.sqrt(self.dim)
         return self.W[u]
 
-    def apply(self, s, u):
+    def apply(self, s, u, K=None):
         """E_u = mask(S_u).  s: (B, N, dim)."""
-        m = self.mask(u)
+        m = self.mask(u, K)
         return s @ m.T if self.mask_type == "haar" else s * m
 
-    def demux(self, z, u):
+    def demux(self, z, u, K=None):
         """Z_u = Demux(Z, M_u)."""
-        m = self.mask(u)
+        m = self.mask(u, K)
         return z @ m if self.mask_type == "haar" else z * m
 
 

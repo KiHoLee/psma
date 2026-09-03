@@ -19,7 +19,8 @@ class Config:
     l_s: int = _l_s()           # semantic embedding dim per token (L_s = L / beta)
     beta: int = MAIN["BETA"]    # expansion factor, L_e = beta * L_s (Nget et al.)
     users: int = MAIN["N"][0]   # number of multiplexed users
-    mask_type: str = "learned"  # learned | hadamard | haar
+    mask_type: str = "learned"  # learned | learned_k | hadamard | haar | oma | deepma
+    load_cond: bool = False     # FiLM load conditioning of the Swin body on the active count (learned_k family)
     mask_seed: int = MAIN["SIGNATURE_SEED"]
     channel: str = MAIN["CHANNEL"]
     rician_k: float = 4.0

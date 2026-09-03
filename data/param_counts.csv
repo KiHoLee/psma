@@ -1,10 +1,12 @@
 chain,side,params
 masked_fixed_u4,tx_total,1192262
-masked_fixed_u4,rx_total_allusers,4767096
+masked_fixed_u4,rx_total_allusers,4767032
 masked_var_u4,tx_total,1192262
-masked_var_u4,rx_total_allusers,4767096
+masked_var_u4,rx_total_allusers,4767032
 oma_u4,tx_total,1192172
-oma_u4,rx_total_allusers,4766824
+oma_u4,rx_total_allusers,4766808
+deepma_u4,tx_total,4768904
+deepma_u4,rx_total_allusers,4767000
 todma_v256,enc,1192154
 todma_v256,dec,1191678
 todma_v256,codebook,2048

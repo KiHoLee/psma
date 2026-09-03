@@ -68,6 +68,16 @@ LBL = {
     # the same variable-load model at one active user, drawn beside its
     # full-load curve so the dimension-rich underload claim is readable
     "masking_var_rich_k1": "Proposed (variable load), $K{=}1$",
+    # DeepMA (Zhang et al., TCCN 2024) adapted to this frame: independent
+    # encoder-decoder pair per user, unit-power superposition, no masks
+    "deepma": "DeepMA",
+    "deepma_offload": "DeepMA, off-load",
+    # throughput figure: the masked chain retrained at each population, and
+    # the single variable-load model provisioned with N = 8 masks
+    "masking_fixed_perN": "Proposed (retrained per $N$)",
+    "masking_var8": "Proposed (one model, $N{=}8$)",
+    # re-encoded OMA retrained at the active count (the adaptive OMA of Table III)
+    "oma_adaptive": "Adaptive OMA (retrained per $K$)",
 }
 STYLE = {
     "masking_fixed": dict(color="#d95f02", marker="o", ls="-"),
@@ -86,12 +96,37 @@ STYLE = {
     # model at a lighter load rather than as a different scheme
     "masking_var_rich_k1": dict(color="#d95f02", marker="s", ls="--",
                                 mfc="none", mew=1.4),
+    # DeepMA in its own hue; the off-load curve is the SAME trained model, so
+    # it carries the same style (the two never share a figure)
+    "deepma": dict(color="#1b9e77", marker="D", ls="-"),
+    "deepma_offload": dict(color="#1b9e77", marker="D", ls="-"),
+    # retrained-per-population masked chain: same style as the fixed-load model it is
+    "masking_fixed_perN": dict(color="#d95f02", marker="o", ls="-"),
+    # the single N=8 variable-load model: variable-load style, open face
+    "masking_var8": dict(color="#d95f02", marker="s", ls="--", mfc="none", mew=1.4),
+    # adaptive OMA: OMA hue, up-triangle like re-encoded OMA, dotted for "retrained per K"
+    "oma_adaptive": dict(color="#1b5d99", marker="^", ls=":"),
 }
 
 rows = list(csv.DictReader(open(DATA)))
+# ser_eval.csv (code/ser_eval.py) carries PSNR and the semantic error rate for
+# every chain; the DeepMA chains live only there, so their PSNR rows join the
+# grid here, and the SER rows feed the throughput figure below.
+SER = os.path.join(ROOT, "data", "ser_eval.csv")
+ser_rows = list(csv.DictReader(open(SER))) if os.path.exists(SER) else []
+for r in ser_rows:
+    r["designed"] = int(r["designed"]); r["active"] = int(r["active"])
+    r["snr"] = int(r["snr"]); r["psnr"] = float(r["psnr"]); r["ser"] = float(r["ser"])
+    if r["scheme"].startswith("deepma") or r["scheme"] == "masking_lk":
+        rows.append({k: r[k] for k in ("scheme", "designed", "active", "snr", "psnr")})
 for r in rows:
     r["designed"] = int(r["designed"]); r["active"] = int(r["active"])
     r["snr"] = int(r["snr"]); r["psnr"] = float(r["psnr"])
+# Adaptive OMA for the underload figure: re-encoded OMA retrained at the active
+# count, i.e. the full-load row of the N = K model, filed under the N_MAIN
+# system so the K sweep can pick it up (N must divide L, so K = 3 has no point).
+rows += [dict(scheme="oma_adaptive", designed=N_MAIN, active=r["active"], snr=r["snr"], psnr=r["psnr"])
+         for r in rows if r["scheme"] == "oma" and r["designed"] == r["active"] and r["active"] <= N_MAIN]
 
 
 def sel(scheme, designed=None, active=None):
@@ -117,7 +152,7 @@ def guard_and_save(fig, ax, name, legend):
     if legend is not None:
         lb = legend.get_window_extent()
         if lb.x0 < 0 or lb.y0 < 0 or lb.x1 > fw or lb.y1 > fh:
-            raise RuntimeError(f"{name}: legend leaves canvas")
+            raise RuntimeError(f"{name}: legend leaves canvas: {lb} vs canvas {fig.get_size_inches() * fig.dpi}")
         pad = 4  # marker radius + line width, display px
         for ln in ax.get_lines():
             xy = ax.transData.transform(list(zip(ln.get_xdata(), ln.get_ydata())))
@@ -167,8 +202,12 @@ def place_legend(fig, ax, **kw):
     # the curves into the lower part of the box and costs more readability than
     # a moved legend does (12.7). Getting this order wrong pushed the
     # dimension-rich figure's y axis to 50 dB for data that spans 12 to 31.
+    # A crowded legend (six entries) as one column needs a huge extension; the
+    # two-column form is tried FIRST here, since a short wide box in the free
+    # top band costs far less axis range than a tall narrow one.
+    pass2 = [("upper center", 2)] + [lc for lc in locs if lc != ("upper center", 2)]
     for f in steps:
-        for loc, ncol in locs:
+        for loc, ncol in pass2:
             ax.set_ylim(y0, y1 + f * (y1 - y0))
             leg = ax.legend(loc=loc, ncol=ncol, **kw)
             if legend_clear(fig, ax, leg):
@@ -208,18 +247,25 @@ def available(series):
 # population, so its K=2 rows are stored under designed=4)
 snr_figure("fig_snr_u2.pdf",
            available([("masking_fixed", N_SMALL, N_SMALL), ("masking_var", N_SMALL, N_SMALL),
-                      ("oma", N_SMALL, N_SMALL), ("todma", N_MAIN, N_SMALL)]))
+                      ("oma", N_SMALL, N_SMALL), ("deepma", N_SMALL, N_SMALL),
+                      ("todma", N_MAIN, N_SMALL)]))
 # Fig: overload N=K at the largest provisioned population
 snr_figure("fig_snr_u4.pdf",
-           [("masking_fixed", N_MAIN, N_MAIN), ("masking_var", N_MAIN, N_MAIN),
-            ("oma", N_MAIN, N_MAIN), ("todma", N_MAIN, N_MAIN)])
+           available([("masking_fixed", N_MAIN, N_MAIN), ("masking_var", N_MAIN, N_MAIN),
+                      ("oma", N_MAIN, N_MAIN), ("deepma", N_MAIN, N_MAIN),
+                      ("todma", N_MAIN, N_MAIN)]))
 
 # Fig: underload PSNR vs K at 10 dB (one curve per scheme, canonical styles;
 # the 20 dB values are listed in the manuscript's load table instead)
 fig = plt.figure(); ax = fig.add_axes(AXRECT)
-for scheme in ("masking_var", "masking_fixed4off", "oma_static", "todma"):
+# adaptive OMA (retrained per K) is a reference, not a compared scheme: its
+# K = 1, 2 points go to Table V, and keeping it out of this figure keeps the
+# legend at five entries so the axes need no extension
+for scheme in ("masking_var", "masking_fixed4off", "oma_static", "deepma_offload", "todma"):
+    # active <= N_MAIN: the token-signature rows for K = 6, 8 also carry
+    # designed = N_MAIN (placeholder) and belong to the overload sweep below
     d = [r for r in rows if r["scheme"] == scheme
-         and r["snr"] == SNR_OP and r["designed"] == N_MAIN]
+         and r["snr"] == SNR_OP and r["designed"] == N_MAIN and r["active"] <= N_MAIN]
     d = sorted(d, key=lambda r: r["active"])
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d],
             label=LBL[scheme], **STYLE[scheme])
@@ -227,6 +273,93 @@ ax.set_xlabel(XLABEL_LOAD); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks(LOADS); ax.grid(True, alpha=0.3)
 leg = place_legend(fig, ax)
 guard_and_save(fig, ax, "fig_underload.pdf", leg)
+
+# Fig: deep-overload sweep at FULL load, PSNR vs N = K at 10 dB. Each masked
+# point is a model trained at that population; re-encoded OMA exists only
+# where B = L/N is an integer (N in {2, 4, 8} on L = 8), so its curve has no
+# N = 6 point and is drawn through the points it has. Token signatures have
+# no provisioned population; their rows sit under designed = N_MAIN.
+OVERLOAD_LOADS = [n for n in (2, 4, 6, 8) if n <= MAIN["L"]]
+fig = plt.figure(); ax = fig.add_axes(AXRECT)
+_series = (("masking_fixed", lambda r: r["designed"] == r["active"]),
+           ("oma", lambda r: r["designed"] == r["active"]),
+           ("deepma", lambda r: r["designed"] == r["active"]),
+           ("todma", lambda r: r["designed"] == N_MAIN))
+_drawn = 0
+for scheme, cond in _series:
+    d = [r for r in rows if r["scheme"] == scheme and r["snr"] == SNR_OP
+         and r["active"] in OVERLOAD_LOADS and cond(r)]
+    d = sorted(d, key=lambda r: r["active"])
+    if len(d) < 2:
+        print("skipping (no data yet): overload sweep,", scheme); continue
+    ax.plot([r["active"] for r in d], [r["psnr"] for r in d],
+            label=LBL[scheme], **STYLE[scheme]); _drawn += 1
+_deep = any(r["scheme"] == "masking_fixed" and r["active"] > N_MAIN
+            and r["designed"] == r["active"] for r in rows)
+if _drawn >= 2 and _deep:
+    ax.set_xlabel("Users $K=N$ (full load, $L=%d$)" % MAIN["L"]); ax.set_ylabel("PSNR (dB)")
+    ax.set_xticks(OVERLOAD_LOADS); ax.grid(True, alpha=0.3)
+    leg = place_legend(fig, ax)
+    guard_and_save(fig, ax, "fig_overload_sweep.pdf", leg)
+else:
+    plt.close(fig); print("fig_overload_sweep.pdf not written: no N > %d masked point yet" % N_MAIN)
+
+# Fig: semantic throughput T(K) = sum over SERVED users of (1 - SER), in
+# correctly delivered images per frame, at the operating point, K = 1..8.
+# A scheme provisioned for N users serves min(K, N): static OMA and DeepMA
+# block the users beyond their design population, so their throughput stops
+# at the K = N value (the author's convention, 2026-09-03). Re-encoded OMA is
+# drawn at the populations it was retrained for. The proposed curve is ONE
+# variable-load model provisioned with N = 8 masks.
+if ser_rows:
+    def tput(scheme, designed, K, cap=None):
+        Ke = min(K, cap) if cap else K
+        d = [r for r in ser_rows if r["scheme"] == scheme and r["designed"] == designed
+             and r["active"] == Ke and r["snr"] == SNR_OP]
+        return Ke * (1.0 - d[0]["ser"]) if d else None
+    KS = list(range(1, 9))
+    series = [("masking_fixed_perN", lambda K: tput("masking_fixed", K, K), dict()),
+              ("masking_var8", lambda K: tput("masking_var", 8, K), dict()),
+              ("oma_static", lambda K: tput("oma_static", N_MAIN, K, cap=N_MAIN), dict()),
+              ("deepma_offload", lambda K: tput("deepma_offload", N_MAIN, K, cap=N_MAIN), dict()),
+              ("oma", lambda K: tput("oma", K, K), dict(ls="none")),
+              ("todma", lambda K: tput("todma", N_MAIN, K), dict())]
+    # Six long entries do not fit inside the axes of a 0.58-columnwidth print
+    # without stretching the y axis to twice the data range, so this figure
+    # alone carries its legend BELOW the axes on the same canvas, two columns
+    # by three rows, and the axes give up the band the legend occupies. The
+    # data area is no smaller than the in-axes placement left it.
+    # The canvas is 5.8 in wide instead of 4.0 so the two-column legend fits
+    # (its box measures 5.6 in), and main.tex includes it at 0.84 columnwidth
+    # instead of 0.58 so every font prints at the SAME size as the other
+    # result figures (same scale factor, same printed height).
+    TW = 5.8
+    fig = plt.figure(figsize=(TW, 3.0))
+    ax = fig.add_axes([AXRECT[0] * 4.0 / TW, 0.445, 1.0 - 0.02 - AXRECT[0] * 4.0 / TW, 0.535]); drawn = 0
+    for key, f, extra in series:
+        pts = [(K, f(K)) for K in KS if f(K) is not None]
+        if len(pts) < 2:
+            print("skipping (no data yet): throughput,", key); continue
+        st = dict(STYLE[key]); st.update(extra)
+        lbl = LBL[key] + (", $N{=}%d$" % N_MAIN if key in ("oma_static", "deepma_offload") else "")
+        lbl = "Re-encoded OMA, retrained per $N$" if key == "oma" else lbl
+        lbl = "Static OMA, $N{=}%d$" % N_MAIN if key == "oma_static" else lbl
+        lbl = "DeepMA, $N{=}%d$" % N_MAIN if key == "deepma_offload" else lbl
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], label=lbl, **st); drawn += 1
+    if drawn >= 2:
+        # Units (images per frame) go in the caption: the full label is taller
+        # than the reduced axes and the guard rejects a clipped label.
+        ax.set_xlabel("Active users $K$"); ax.set_ylabel("Throughput $T(K)$")
+        ax.set_xticks(KS); ax.grid(True, alpha=0.3)
+        y0, y1 = ax.get_ylim(); ax.set_ylim(0.0, y1)
+        # Anchored on the CANVAS center, not the axes center: the axes sit
+        # right of center because of the y-label margin, and a box centered on
+        # them ran off the right edge.
+        leg = ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.30), ncol=2,
+                        bbox_transform=fig.transFigure, columnspacing=0.8)
+        guard_and_save(fig, ax, "fig_throughput.pdf", leg)
+    else:
+        plt.close(fig); print("fig_throughput.pdf not written: too few series")
 
 # Fig: dimension-rich full load (L=32, N=K=2, all four chains)
 snr_figure("fig_snr_rich.pdf",

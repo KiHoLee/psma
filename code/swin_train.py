@@ -19,7 +19,7 @@ p.add_argument("--dataset", default=MAIN["DATASET"], choices=["cifar", "imagenet
 p.add_argument("--img_size", type=int, default=MAIN["CROP"])
 p.add_argument("--stages", type=int, default=MAIN["STAGES"], choices=[2, 3, 4], help="Swin stages: token = (2*2^(stages-1))^2 pixels")
 p.add_argument("--users", type=int, default=MAIN["N"][0])
-p.add_argument("--mask", default="learned", choices=["learned", "hadamard", "haar", "oma"])
+p.add_argument("--mask", default="learned", choices=["learned", "learned_k", "hadamard", "haar", "oma", "deepma"])
 p.add_argument("--beta", type=int, default=MAIN["BETA"])
 p.add_argument("--l_s", type=int, default=MAIN_L_S(), help="L_s = L / beta; the manuscript's L is l_e")
 p.add_argument("--channel", default=MAIN["CHANNEL"], choices=["awgn", "rician", "rayleigh", "rayleigh_fs"])
@@ -32,6 +32,7 @@ p.add_argument("--seed", type=int, default=MAIN["SEED"])
 p.add_argument("--out", default=wpath("checkpoints", "swinsc"))
 p.add_argument("--resume", action="store_true")
 p.add_argument("--amp", action="store_true", help="bf16 autocast")
+p.add_argument("--load_cond", action="store_true", help="FiLM-condition the Swin body on the active count (learned_k family)")
 p.add_argument("--var_load", action="store_true", help="train with a random number of ACTIVE users per step (underload-robust)")
 a = p.parse_args()
 
@@ -39,7 +40,7 @@ random.seed(a.seed); torch.manual_seed(a.seed)
 dev = MAIN_DEVICE()
 ARCH = {2: ((96, 192), (2, 2), (3, 6)), 3: ((96, 192, 384), (2, 2, 2), (3, 6, 12)), 4: ((96, 192, 384, 768), (2, 2, 2, 2), (3, 6, 12, 24))}
 dims, depths, heads = ARCH[a.stages]
-cfg = Config(img_size=a.img_size if a.dataset == "imagenette" else 32, users=a.users, mask_type=a.mask, beta=a.beta, l_s=a.l_s, channel=a.channel,
+cfg = Config(img_size=a.img_size if a.dataset == "imagenette" else 32, users=a.users, mask_type=a.mask, beta=a.beta, l_s=a.l_s, channel=a.channel, load_cond=a.load_cond,
              dims=dims, depths=depths, heads=heads)
 os.makedirs(a.out, exist_ok=True); cfg.save(os.path.join(a.out, "config.json"))
 tx, rx = Transmitter(cfg).to(dev), Receiver(cfg).to(dev)
@@ -69,7 +70,7 @@ def run(imgs, snr, active=None):
     with torch.autocast("cuda", dtype=torch.bfloat16, enabled=a.amp):
         f, hw = tx([imgs[u] for u in active], active=active)
         z = ch(f.float(), snr)
-        outs = [rx(z, u, hw).float() for u in active]
+        outs = [rx(z, u, hw, K=len(active)).float() for u in active]
     return outs, active
 
 

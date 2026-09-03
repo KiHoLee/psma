@@ -67,7 +67,7 @@ def run_masked(name, active):
     with torch.no_grad():
         f, hw = tx(xs, active=active)
         z = channel_fixed(f, 2026)
-        out = rx(z, active[0], hw)
+        out = rx(z, active[0], hw, K=len(active))
     v = psnr(out, xs[0]).item()
     return out[0].cpu(), v
 

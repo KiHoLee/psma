@@ -122,7 +122,8 @@ class PatchExpanding(nn.Module):
 class SwinEncoder(nn.Module):
     """image -> patch embed -> [stage -> merge]* -> semantic tokens (B, N, L_s)."""
 
-    def __init__(self, in_ch=3, patch=2, dims=(96, 192), depths=(2, 2), heads=(3, 6), ws=4, out_dim=None):
+    def __init__(self, in_ch=3, patch=2, dims=(96, 192), depths=(2, 2), heads=(3, 6), ws=4, out_dim=None,
+                 n_loads=None):
         super().__init__()
         self.patch, self.ws, self.n_stages = patch, ws, len(dims)
         self.embed = nn.Conv2d(in_ch, dims[0], patch, patch)
@@ -135,22 +136,50 @@ class SwinEncoder(nn.Module):
         self.norm = nn.LayerNorm(dims[-1])
         self.head = nn.Linear(dims[-1], out_dim) if out_dim else nn.Identity()
         self.down = patch * 2 ** (len(dims) - 1)
+        # Load conditioning (2026-09-03): a learned embedding of the active count K
+        # modulates every stage output by a FiLM scale and shift, so the body can
+        # emit a load-specific representation (spread over the frame when alone,
+        # concentrated when the mask keeps few dimensions). Zero-initialized, so a
+        # conditioned network starts as the unconditioned one; absent (n_loads
+        # None) the module and the state dict are byte-identical to before.
+        self.cond = LoadFiLM(n_loads, dims) if n_loads else None
 
-    def forward(self, img):
+    def forward(self, img, K=None):
         x = self.embed(img)
         B, C, H, W = x.shape
         x = self.norm0(x.flatten(2).transpose(1, 2))
         for i, st in enumerate(self.stages):
             x = st(x, H, W)
+            if self.cond is not None:
+                x = self.cond(x, i, K)
             if i < len(self.merges):
                 x, H, W = self.merges[i](x, H, W)
         return self.head(self.norm(x)), (H, W)
 
 
+class LoadFiLM(nn.Module):
+    """Per-stage FiLM modulation driven by the active count K in {1, ..., n_loads}."""
+
+    def __init__(self, n_loads, dims, emb=32):
+        super().__init__()
+        self.n_loads = n_loads
+        self.emb = nn.Embedding(n_loads, emb)
+        self.film = nn.ModuleList([nn.Linear(emb, 2 * d) for d in dims])
+        for lin in self.film:                       # start as identity modulation
+            nn.init.zeros_(lin.weight); nn.init.zeros_(lin.bias)
+
+    def forward(self, x, stage, K):
+        K = self.n_loads if K is None else K
+        e = self.emb(torch.tensor(K - 1, device=x.device))
+        gamma, beta = self.film[stage](e).chunk(2)
+        return x * (1 + gamma) + beta
+
+
 class SwinDecoder(nn.Module):
     """semantic tokens (B, N, L_s) -> [stage -> expand]* -> image (B, 3, H, W) in [0,1]."""
 
-    def __init__(self, out_ch=3, patch=2, dims=(192, 96), depths=(2, 2), heads=(6, 3), ws=4, in_dim=None):
+    def __init__(self, out_ch=3, patch=2, dims=(192, 96), depths=(2, 2), heads=(6, 3), ws=4, in_dim=None,
+                 n_loads=None):
         super().__init__()
         self.patch = patch
         self.head = nn.Linear(in_dim, dims[0]) if in_dim else nn.Identity()
@@ -162,12 +191,15 @@ class SwinDecoder(nn.Module):
                 self.expands.append(PatchExpanding(dims[i], dims[i + 1]))
         self.norm = nn.LayerNorm(dims[-1])
         self.out = nn.Linear(dims[-1], out_ch * patch * patch)
+        self.cond = LoadFiLM(n_loads, dims) if n_loads else None   # see SwinEncoder
 
-    def forward(self, tok, hw):
+    def forward(self, tok, hw, K=None):
         H, W = hw
         x = self.norm0(self.head(tok))
         for i, st in enumerate(self.stages):
             x = st(x, H, W)
+            if self.cond is not None:
+                x = self.cond(x, i, K)
             if i < len(self.expands):
                 x, H, W = self.expands[i](x, H, W)
         x = self.out(self.norm(x))                                       # (B, H*W, 3*p*p)
