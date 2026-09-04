@@ -35,7 +35,7 @@ MAIN = {
     "CHANNEL": "rayleigh",        # Rayleigh block fading with perfect-CSI ZF
 
     # --- population ---------------------------------------------------------
-    "N": (4, 8),                  # provisioned populations of the PSMA manuscript: N[0] is the main frame (Figs. 2-4), N[1] = L the eight-load frame
+    "N": (4, 8),                  # provisioned populations of the PSMA manuscript: N[0] is the main frame (Figs. 3-5), N[1] = L the eight-load frame
 
     # --- source -------------------------------------------------------------
     "DATASET": "imagenette",

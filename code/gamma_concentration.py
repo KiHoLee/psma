@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Concentration of the frame normalization, quoted in the Appendix.
+"""Concentration of the frame normalization, discussed in Remark 1.
 
 Under the appendix assumptions (zero-mean, uncorrelated, unit-variance,
 independent across tokens, Gaussian fourth moments),

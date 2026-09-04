@@ -1,4 +1,4 @@
-"""Monte Carlo verification of the closed-form SINR (Prop. 2, eq. (9)).
+"""Monte Carlo verification of the closed-form SINR (Sec. V-B, eq. (14)).
 
 Simulates the masked chain under the proposition's assumptions (white
 unit-variance embeddings, w_u = 1, exact per-frame normalization) with

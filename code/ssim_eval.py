@@ -98,7 +98,7 @@ def eval_masked(name, scheme, designed, actives):
 
 eval_masked("swinsc_ov_u4_learned", "masking_fixed", 4, [4])
 eval_masked("swinsc_ov_u4_oma", "oma", 4, [4])
-eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [1, 2, 3, 4])   # the N=4 pairs held fixed (Table VIII row "DeepMA, N=4")
+eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [1, 2, 3, 4])   # the N=4 pairs held fixed (Table VII row "DeepMA, N=4")
 eval_masked("swinsc_ov_u4var_learned", "masking_var", 4, [1, 2, 3, 4])
 if os.path.exists(os.path.join(CK, "swinsc_ov_u4_psma", "tx.pt")):     # PSMA (2026-09-04)
     eval_masked("swinsc_ov_u4_psma", "psma", 4, [1, 2, 3, 4])

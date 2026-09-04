@@ -1,4 +1,4 @@
-﻿"""Coherence of the ToDMA signature dictionary quoted in Remark 3.
+﻿"""Coherence of the ToDMA signature dictionary quoted in Remark 2.
 
 The dictionary is regenerated exactly as code/tsp_eval.py builds it (seed 2026,
 V Gaussian rows normalized to squared norm D), so the number in the manuscript

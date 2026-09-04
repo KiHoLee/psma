@@ -215,9 +215,9 @@ def montage(panels, fname, ncols):
 
 
 #: Manuscript figure (fig_visual.pdf): two rows (K = 1 and K = 4 on the N = 4
-#: frame) by six columns, authored 12.30 x 4.85 in and included at
-#: 0.95\textwidth (6.84 in), print scale 0.556: the 14 pt headers print at
-#: 7.8 pt, in line with the other figures' 7.6-7.8 pt (standard 9.3).
+#: frame) by six columns, authored 12.30 x 4.56 in; the manuscript copy is
+#: assembled by plot_results.py and included at 0.72\textwidth (print scale
+#: 0.42, headers 5.9 pt), in line with the other figures' 7.6-7.8 pt (standard 9.3).
 PANEL_W, ROW_H, HEADER_PT = 2.05, 2.28, 14.0
 PAPER_COLS = ["Original", "PSMA", "Learned masks", "Token signatures", "DeepMA, $N{=}4$", "Static OMA"]
 PAPER_KEY = {  # column label -> slug of the panel that supplies it, per row K

@@ -1,6 +1,6 @@
 """Canonical replot script for paper 12 (TSP), PSMA version (2026-09-04).
 
-Reads ONLY data/ser_eval.csv (code/ser_eval.py: PSNR and semantic error rate
+Reads only data/ (ser_eval.csv, masks.csv, prefix_eval.csv, visual/) (code/ser_eval.py: PSNR and semantic error rate
 of every chain at every load and SNR, one source for every number in the
 manuscript) and writes the result figures (Figs. 3-8) and the reconstruction panel
 (Fig. 9, from data/visual/) to fig/ as vector PDF with
@@ -11,10 +11,10 @@ comes from code/config_main.py. It also prints the rows of the load table
 Geometry: every result figure is authored on a 6.8 x 5.3 in canvas with an
 8:6 axes box and its legend INSIDE the axes (author's request), placed by a
 corner sweep with y-axis headroom so that no curve point lies under it, and
-is included at 0.80 columnwidth (author's choice, 2026-09-04, after the
-page budget), so every authored font prints at 0.80 * 252 / (6.8 * 72) =
-0.41 of itself: ticks 15.5 -> 6.4 pt, axis labels 16 -> 6.6 pt, legend
-15 -> 6.2 pt (kept small on the author's request so the legend box takes
+is included at 0.78 columnwidth (author's choice, 2026-09-04, after the
+page budget), so every authored font prints at 0.78 * 252 / (6.8 * 72) =
+0.40 of itself: ticks 15.5 -> 6.2 pt, axis labels 16 -> 6.4 pt, legend
+15 -> 6.0 pt (kept small on the author's request so the legend box takes
 little of the plot area). Guards (standard 12.7): every label and the legend box are checked
 against the canvas and every curve point against the legend box.
 
@@ -34,8 +34,8 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config_main import MAIN   # the ONE configuration (standard 7.9)
 
-N_MAIN = MAIN["N"][0]           # 4, the provisioned frame of Figs. 2-4
-L = MAIN["L"]                   # 8, the frame dimension and the N of Figs. 5-6
+N_MAIN = MAIN["N"][0]           # 4, the provisioned frame of Figs. 3-5
+L = MAIN["L"]                   # 8, the frame dimension and the N of Figs. 7-8
 SNR_OP = MAIN["SNR_OP"]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,10 +44,10 @@ FIG = os.path.join(ROOT, "fig")
 os.makedirs(FIG, exist_ok=True)
 
 # Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 5.3 in) and
-# one axes box of 5.68 x 4.24 in (8:6), included at 0.80 columnwidth (202 pt),
-# so the print scale is 202 / (6.8 * 72) = 0.41 and the authored 15.5 pt
-# fonts print at 6.4 pt (ticks), 16 pt labels at 6.6 pt, and the 15 pt
-# legend at 6.2 pt. The legend sits inside the axes (author's request, kept
+# one axes box of 5.68 x 4.24 in (8:6), included at 0.78 columnwidth (197 pt),
+# so the print scale is 197 / (6.8 * 72) = 0.40 and the authored 15.5 pt
+# fonts print at 6.2 pt (ticks), 16 pt labels at 6.4 pt, and the 15 pt
+# legend at 6.0 pt. The legend sits inside the axes (author's request, kept
 # small so it takes little of the plot area) with y-axis headroom.
 TW, TH = 6.8, 5.3
 plt.rcParams.update({
@@ -81,9 +81,9 @@ LBL = {
     "prog_v1": "PSMA, $N{=}8$, no prefix term",
 }
 # One (color, marker, line style) triple per scheme, never overridden per
-# figure: proposed = solid, single-model conventional = dashed, reallocated
-# reference = dotted, chains retrained per population = solid with open
-# markers, token signatures = dash-dot.
+# figure: proposed = solid, single-model conventional = dashed, the
+# no-prefix-term prototype = dotted, token signatures = dash-dot; N = 8
+# variants share the triple of their N = 4 model with open markers.
 STYLE = {
     "psma": dict(color="#d95f02", marker="o", ls="-"),
     "psma4": dict(color="#d95f02", marker="o", ls="-"),
@@ -205,7 +205,7 @@ X_K = lambda r: r["active"]
 Y_PSNR = lambda r: r["psnr"]
 Y_T = lambda r: r["active"] * (1.0 - r["ser"])
 
-# ---- Fig. 2: load sweep on the N = 4 frame at the operating point ----------
+# ---- Fig. 3: load sweep on the N = 4 frame at the operating point ----------
 fig, ax = new_figure()
 n = draw(ax, [("psma", N_MAIN, None), ("masking_var", N_MAIN, None), ("oma_static", N_MAIN, None),
               ("deepma_offload", N_MAIN, None), ("todma", N_MAIN, None)],
@@ -220,7 +220,7 @@ ax.set_xlabel("Active users $K$ (provisioned $N=%d$)" % N_MAIN); ax.set_ylabel("
 ax.set_xticks(range(1, N_MAIN + 1)); ax.grid(True, alpha=0.3)
 guard_and_save(fig, ax, "fig_load4.pdf", legend_below(fig, ax))
 
-# ---- Figs. 3-4: PSNR vs SNR with one active user and at full load ----------
+# ---- Figs. 4-5: PSNR vs SNR with one active user and at full load ----------
 for name, K, series in (
         ("fig_snr_k1.pdf", 1, [("psma", N_MAIN, 1), ("masking_var", N_MAIN, 1), ("oma_static", N_MAIN, 1),
                                ("deepma_offload", N_MAIN, 1), ("todma", N_MAIN, 1)]),
@@ -236,7 +236,7 @@ for name, K, series in (
     ax.set_xlabel("SNR (dB)"); ax.set_ylabel("PSNR (dB)"); ax.grid(True, alpha=0.3)
     guard_and_save(fig, ax, name, legend_below(fig, ax))
 
-# ---- Fig. 5: one model across eight loads --------------------------------------
+# ---- Fig. 7: one model across eight loads --------------------------------------
 fig, ax = new_figure()
 # The figures stop at K = L (author's decision, 2026-09-04): the K = 9..16
 # tight-frame rows (scheme psma_tf) stay in data/ser_eval.csv as author
@@ -251,7 +251,7 @@ if d:
 draw(ax, [("todma", N_MAIN, None)], X_K, Y_PSNR, snr=SNR_OP)
 # DeepMA held fixed at its N = 8 training load and evaluated at K = 1..8, the
 # fixed-model counterpart of the PSMA and learned-mask curves (author's
-# decision, 2026-09-04; the retrained N = K values remain in Table VI).
+# decision, 2026-09-04).
 d = sel("deepma_offload", L, None, SNR_OP)
 if d:
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["deepma8"], **STYLE["deepma8"])
@@ -259,7 +259,7 @@ ax.set_xlabel("Active users $K$ ($N=%d$)" % L); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
 
-# ---- Fig. 6: semantic throughput T(K) = sum over served users of (1 - SER) -----
+# ---- Fig. 8: semantic throughput T(K) = sum over served users of (1 - SER) -----
 # A scheme provisioned for N serves min(K, N): static OMA and DeepMA (N = 4)
 # stop at their K = N value (the author's convention, 2026-09-03).
 fig, ax = new_figure()
@@ -328,8 +328,8 @@ for label, scheme, designed in ((LBL["psma4"], "psma", N_MAIN), (LBL["psma8"], "
     print(ser_row(label, scheme, designed))
 # ---- Fig. 2 (Sec. V-B): trained masks of the mask-based chain, per-user squared
 # mask profile and overlap matrix (data/masks.csv, dumped by dump_artifacts.py).
-# Own canvas (4.0 x 2.05 in, included at 0.68 columnwidth, print scale 0.60: 12 -> 7.1 pt, 10.7 -> 6.4 pt):
-# authored 12 / 10.7 pt print at 8.4 / 7.5 pt.
+# Own canvas (4.0 x 2.05 in, included at 0.60 columnwidth, print scale 0.525):
+# authored 12 pt labels, ticks and cell values print at 6.3 pt.
 MASKS = os.path.join(ROOT, "data", "masks.csv")
 if os.path.exists(MASKS):
     mrows = list(csv.DictReader(open(MASKS)))
@@ -341,7 +341,7 @@ if os.path.exists(MASKS):
     fig, (axm, axb) = plt.subplots(
         1, 2, figsize=(4.0, 2.05), gridspec_kw={"width_ratios": [LM, U + 1.5]})
     for ax_ in (axm, axb):
-        ax_.tick_params(labelsize=10.7)
+        ax_.tick_params(labelsize=12.0)
     im0 = axm.imshow(M2, cmap="Oranges", aspect="auto", vmin=0)
     axm.set_xlabel("Dimension $i$", fontsize=12.0); axm.set_ylabel("User $u$", fontsize=12.0)
     axm.set_xticks(range(LM)); axm.set_yticks(range(U))
@@ -355,11 +355,11 @@ if os.path.exists(MASKS):
     axb.set_title(r"$\beta_{uv}$", fontsize=12.0)
     for u in range(U):
         for v in range(U):
-            axb.text(v, u, f"{beta[u][v]:.1f}", ha="center", va="center", fontsize=10.7,
+            axb.text(v, u, f"{beta[u][v]:.1f}", ha="center", va="center", fontsize=12.0,
                      color="white" if beta[u][v] >= 1.6 else "black")
     cb = fig.colorbar(im0, ax=axm, fraction=0.046, pad=0.04)
     cb.ax.set_title("$m_u^2(i)$", fontsize=12.0, pad=3)
-    cb.ax.tick_params(labelsize=10.7)
+    cb.ax.tick_params(labelsize=12.0)
     fig.subplots_adjust(left=0.135, right=0.97, top=0.855, bottom=0.285, wspace=0.55)
     fig.canvas.draw()
     fw, fh = fig.get_size_inches() * fig.dpi
@@ -405,8 +405,8 @@ if os.path.exists(PREFIX):
 # N = 4 frame at K = 1 and K = 4, assembled from the panels that
 # code/visual_eval.py stored under data/visual/ (PNG per scheme and load, PSNR
 # per panel in visual_psnr.csv), so the manuscript figure is regenerated from
-# data/ alone. Authored 12.30 x 4.56 in, included at 0.95\textwidth (6.84 in,
-# print scale 0.44): the 14 pt headers print at 6.2 pt.
+# data/ alone. Authored 12.30 x 4.56 in, included at 0.72\textwidth (5.16 in,
+# print scale 0.42): the 14 pt headers print at 5.9 pt.
 VIS = os.path.join(ROOT, "data", "visual")
 if os.path.exists(os.path.join(VIS, "visual_psnr.csv")):
     from PIL import Image

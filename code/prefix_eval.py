@@ -1,4 +1,4 @@
-"""Quality of the PSMA progressive code versus prefix length (manuscript Fig. 8).
+"""Quality of the PSMA progressive code versus prefix length (manuscript Fig. 6).
 
 One user alone on the frame transmits the first b symbols of its code on the
 first b rows of Q, b = 1..L, at UNIT power per symbol (the power a user
