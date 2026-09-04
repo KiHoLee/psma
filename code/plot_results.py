@@ -2,7 +2,8 @@
 
 Reads ONLY data/ser_eval.csv (code/ser_eval.py: PSNR and semantic error rate
 of every chain at every load and SNR, one source for every number in the
-manuscript) and writes the five result figures to fig/ as vector PDF with
+manuscript) and writes the result figures (Figs. 3-8) and the reconstruction panel
+(Fig. 9, from data/visual/) to fig/ as vector PDF with
 one shared geometry. Every population, operating point and axis label
 comes from code/config_main.py. It also prints the rows of the load table
 (Table VI) so the manuscript quotes the same file the figures draw.
@@ -10,10 +11,11 @@ comes from code/config_main.py. It also prints the rows of the load table
 Geometry: every result figure is authored on a 6.8 x 5.3 in canvas with an
 8:6 axes box and its legend INSIDE the axes (author's request), placed by a
 corner sweep with y-axis headroom so that no curve point lies under it, and
-is included at 0.85 columnwidth (author's choice, 2026-09-04), so every
-authored font prints at 0.85 * 252 / (6.8 * 72) = 0.44 of itself: ticks
-15.5 -> 6.8 pt, axis labels 16 -> 7.0 pt, legend 14 -> 6.1 pt (kept small
-on the author's request so the legend box takes little of the plot area). Guards (standard 12.7): every label and the legend box are checked
+is included at 0.80 columnwidth (author's choice, 2026-09-04, after the
+page budget), so every authored font prints at 0.80 * 252 / (6.8 * 72) =
+0.41 of itself: ticks 15.5 -> 6.4 pt, axis labels 16 -> 6.6 pt, legend
+15 -> 6.2 pt (kept small on the author's request so the legend box takes
+little of the plot area). Guards (standard 12.7): every label and the legend box are checked
 against the canvas and every curve point against the legend box.
 
     python code/plot_results.py
@@ -24,6 +26,7 @@ archive/masks_submission_20260903/plot_results.py.
 import csv
 import os
 import sys
+from decimal import Decimal, ROUND_HALF_UP
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -41,14 +44,14 @@ FIG = os.path.join(ROOT, "fig")
 os.makedirs(FIG, exist_ok=True)
 
 # Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 5.3 in) and
-# one axes box of 5.68 x 4.24 in (8:6), included at 0.85 columnwidth (214 pt),
-# so the print scale is 214 / (6.8 * 72) = 0.44 and the authored 15.5 pt
-# fonts print at 6.8 pt (ticks), 16 pt labels at 7.0 pt, and the 14 pt
-# legend at 6.1 pt. The legend sits inside the axes (author's request, kept
+# one axes box of 5.68 x 4.24 in (8:6), included at 0.80 columnwidth (202 pt),
+# so the print scale is 202 / (6.8 * 72) = 0.41 and the authored 15.5 pt
+# fonts print at 6.4 pt (ticks), 16 pt labels at 6.6 pt, and the 15 pt
+# legend at 6.2 pt. The legend sits inside the axes (author's request, kept
 # small so it takes little of the plot area) with y-axis headroom.
 TW, TH = 6.8, 5.3
 plt.rcParams.update({
-    "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 14.0,
+    "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 15.0,
     "lines.markersize": 7.0, "lines.linewidth": 1.8,
     "pdf.fonttype": 42, "figure.figsize": (TW, TH), "mathtext.fontset": "cm",
     "legend.labelspacing": 0.2, "legend.handlelength": 1.4,
@@ -73,7 +76,7 @@ LBL = {
     "deepma_offload": "DeepMA, $N{=}4$",
     "todma": "Token signatures",
     # Fig. 6 ablation of the per-prefix term (prefix_eval.csv, column "model")
-    "psma_pow2": "PSMA, powers of two",
+    "psma_pow2": "PSMA, $N{=}4$, powers of two",
     "psma8_pow2": "PSMA, $N{=}8$, powers of two",
     "prog_v1": "PSMA, $N{=}8$, no prefix term",
 }
@@ -274,7 +277,9 @@ for scheme, designed, cap in (("psma", L, None), ("masking_var", L, None),
     if len(pts) < 2:
         print("skipping (no data yet): throughput,", scheme); continue
     key = {"psma": "psma8", "masking_var": "masking_var8"}.get(scheme, scheme)   # the N = 8 models
-    ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[key], **STYLE[key]); drawn += 1
+    # the two capped curves coincide from K = 4 on: stagger their markers (9.4)
+    ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[key],
+            markevery=(drawn % 2, 2) if scheme in ("oma_static", "deepma_offload") else None, **STYLE[key]); drawn += 1
 ax.set_xlabel("Active users $K$"); ax.set_ylabel(r"Throughput $\Theta(K)$ (images/frame)")
 ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 y0, y1 = ax.get_ylim(); ax.set_ylim(0.0, y1)
@@ -311,11 +316,11 @@ def ser_row(label, scheme, designed, snr=SNR_OP):
     cells = []
     for K in range(1, L + 1):
         d = sel(scheme, designed, K, snr)
-        cells.append("%.2f" % d[0]["ser"] if d else "---")
+        cells.append(str(Decimal(str(d[0]["ser"])).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)) if d else "---")
     return "%s & %s \\\\" % (label, " & ".join(cells))
 
 
-print("\n%% Table VII SER rows at %d dB, K = 1..8" % SNR_OP)
+print("\n%% Table VI SER rows at %d dB, K = 1..8" % SNR_OP)
 for label, scheme, designed in ((LBL["psma4"], "psma", N_MAIN), (LBL["psma8"], "psma", L),
                                 ("Learned masks, $N{=}8$", "masking_var", L),
                                 (LBL["todma"], "todma", N_MAIN), (LBL["deepma8"], "deepma_offload", L),
@@ -323,7 +328,7 @@ for label, scheme, designed in ((LBL["psma4"], "psma", N_MAIN), (LBL["psma8"], "
     print(ser_row(label, scheme, designed))
 # ---- Fig. 2 (Sec. V-B): trained masks of the mask-based chain, per-user squared
 # mask profile and overlap matrix (data/masks.csv, dumped by dump_artifacts.py).
-# Own canvas (4.0 x 2.05 in, included at 0.80 columnwidth, print scale 0.70):
+# Own canvas (4.0 x 2.05 in, included at 0.68 columnwidth, print scale 0.60: 12 -> 7.1 pt, 10.7 -> 6.4 pt):
 # authored 12 / 10.7 pt print at 8.4 / 7.5 pt.
 MASKS = os.path.join(ROOT, "data", "masks.csv")
 if os.path.exists(MASKS):
@@ -383,7 +388,7 @@ if os.path.exists(PREFIX):
     # (legend key, model column, provisioned N): the two PSMA models trained
     # with the per-prefix term over every length, the earlier models whose
     # term visited the powers of two only, and the prototype without the term
-    for key, model, d in (("psma", "psma", 4), ("psma8", "psma", 8),
+    for key, model, d in (("psma4", "psma", 4), ("psma8", "psma", 8),
                           ("psma_pow2", "psma_pow2", 4), ("psma8_pow2", "psma_pow2", 8),
                           ("prog_v1", "prog_v1", 8)):
         pts = sorted([(int(r["prefix"]), float(r["psnr"])) for r in prow
@@ -395,5 +400,43 @@ if os.path.exists(PREFIX):
     ax.set_xlabel("Prefix length $b$ (symbols per token, one user, %d dB)" % SNR_OP); ax.set_ylabel("PSNR (dB)")
     ax.set_xticks(range(1, L + 1)); ax.grid(True, alpha=0.3)
     guard_and_save(fig, ax, "fig_prefix.pdf", legend_below(fig, ax))
+
+# ---- Fig. 9 (Sec. VI-F): reconstructions of one image by every scheme on the
+# N = 4 frame at K = 1 and K = 4, assembled from the panels that
+# code/visual_eval.py stored under data/visual/ (PNG per scheme and load, PSNR
+# per panel in visual_psnr.csv), so the manuscript figure is regenerated from
+# data/ alone. Authored 12.30 x 4.56 in, included at 0.95\textwidth (6.84 in,
+# print scale 0.44): the 14 pt headers print at 6.2 pt.
+VIS = os.path.join(ROOT, "data", "visual")
+if os.path.exists(os.path.join(VIS, "visual_psnr.csv")):
+    from PIL import Image
+    IDX = 7
+    vp = {(int(r["image"]), r["panel"]): float(r["psnr_db"])
+          for r in csv.DictReader(open(os.path.join(VIS, "visual_psnr.csv")))}
+    COLS = [("Original", None, None), ("PSMA", "psma", "PSMA"),                 # declared ORDER
+            ("Learned masks", "learned_masks", "Learned masks"),
+            ("Token signatures", "token_signatures", "Token signatures"),
+            ("DeepMA, $N{=}4$", "deepma_n4", "DeepMA N=4"),
+            ("Static OMA", "static_oma_any_k", "Static OMA, any K")]
+    PANEL_W, ROW_H, HEADER_PT = 2.05, 2.28, 14.0
+    figv, axes = plt.subplots(2, len(COLS), figsize=(PANEL_W * len(COLS), ROW_H * 2))
+    for r, K in enumerate((1, 4)):
+        for c, (title, slug, key) in enumerate(COLS):
+            ax = axes[r][c]
+            if slug is None:
+                img = Image.open(os.path.join(VIS, "img%d" % IDX, "original.png"))
+                head = "Original" if r == 0 else ""
+            else:
+                fname = slug + ".png" if slug == "static_oma_any_k" else "%s_k%d.png" % (slug, K)
+                img = Image.open(os.path.join(VIS, "img%d" % IDX, fname))
+                v = vp[(IDX, key if slug == "static_oma_any_k" else "%s, K=%d" % (key, K))]
+                head = (title + "\n" if r == 0 else "") + "$K{=}%d$, %.1f dB" % (K, v)
+            ax.imshow(img); ax.set_title(head, fontsize=HEADER_PT)
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_linewidth(0.4)
+    figv.subplots_adjust(left=0.005, right=0.995, top=0.86, bottom=0.01, wspace=0.04, hspace=0.24)
+    figv.savefig(os.path.join(FIG, "fig_visual.pdf")); plt.close(figv)
+    print("wrote fig_visual.pdf")
 
 print("done")

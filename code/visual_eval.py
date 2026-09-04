@@ -219,7 +219,7 @@ def montage(panels, fname, ncols):
 #: 0.95\textwidth (6.84 in), print scale 0.556: the 14 pt headers print at
 #: 7.8 pt, in line with the other figures' 7.6-7.8 pt (standard 9.3).
 PANEL_W, ROW_H, HEADER_PT = 2.05, 2.28, 14.0
-PAPER_COLS = ["Original", "PSMA", "Learned masks", "Static OMA", "DeepMA, $N{=}4$", "Token signatures"]
+PAPER_COLS = ["Original", "PSMA", "Learned masks", "Token signatures", "DeepMA, $N{=}4$", "Static OMA"]
 PAPER_KEY = {  # column label -> slug of the panel that supplies it, per row K
     1: {"PSMA": "psma_k1", "Learned masks": "learned_masks_k1", "Static OMA": "static_oma_any_k",
         "DeepMA, $N{=}4$": "deepma_n4_k1", "Token signatures": "token_signatures_k1"},
@@ -245,8 +245,8 @@ def paper_figure(orig, results, fname):
             for sp in ax.spines.values():
                 sp.set_linewidth(0.4)
     fig.subplots_adjust(left=0.005, right=0.995, top=0.86, bottom=0.01, wspace=0.04, hspace=0.24)
-    fig.savefig(os.path.join(a.out, fname))
-    plt.close(fig)
+    fig.savefig(os.path.join(a.out, fname))   # preview copy; the manuscript figure is
+    plt.close(fig)                                # assembled from the PNGs by plot_results.py
     print("wrote", fname, flush=True)
 
 
