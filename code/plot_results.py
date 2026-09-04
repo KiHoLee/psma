@@ -67,9 +67,10 @@ LBL = {
     "masking_var": "Learned masks",
     "masking_var8": "Learned masks, $N{=}8$",
     "oma_static": "Static OMA",
-    "wh_dynamic": "WH masks, per-rate heads",
+    "wh_dynamic": "WH masks",
     "deepma": "DeepMA, $N{=}K$",
-    "deepma_offload": "DeepMA, off-load",
+    "deepma8": "DeepMA, $N{=}8$",
+    "deepma_offload": "DeepMA, $N{=}4$",
     "todma": "Token signatures",
 }
 # One (color, marker, line style) triple per scheme, never overridden per
@@ -84,12 +85,13 @@ STYLE = {
     "oma_static": dict(color="#1b5d99", marker="v", ls="--"),
     "wh_dynamic": dict(color="#1b5d99", marker="P", ls=":"),
     "deepma": dict(color="#1b9e77", marker="D", ls="-", mfc="none", mew=1.6),
+    "deepma8": dict(color="#1b9e77", marker="D", ls="--", mfc="none", mew=1.6),
     "deepma_offload": dict(color="#1b9e77", marker="D", ls="--"),
     "todma": dict(color="#7570b3", marker="d", ls="-."),
 }
 # one declared order for legends (tables in main.tex follow the same order)
 ORDER = ["psma", "psma8", "wh_dynamic", "masking_var", "masking_var8",
-         "todma", "deepma", "deepma_offload", "oma_static"]
+         "todma", "deepma", "deepma8", "deepma_offload", "oma_static"]
 ORDER_LBL = [LBL[k] for k in ORDER]
 
 rows = list(csv.DictReader(open(DATA)))
@@ -214,8 +216,11 @@ for name, K, series in (
                                ("wh_dynamic", L, 1), ("deepma_offload", N_MAIN, 1), ("todma", N_MAIN, 1)]),
         ("fig_snr_k4.pdf", N_MAIN, [("psma", N_MAIN, N_MAIN), ("masking_var", N_MAIN, N_MAIN),
                                     ("oma_static", N_MAIN, N_MAIN),
-                                    ("wh_dynamic", L, N_MAIN), ("deepma", N_MAIN, N_MAIN),
+                                    ("wh_dynamic", L, N_MAIN), ("deepma_offload", N_MAIN, N_MAIN),
                                     ("todma", N_MAIN, N_MAIN)])):
+    # Figs. 3-5 and Table VI quote ONE evaluation run of the N = 4 DeepMA pairs
+    # (scheme deepma_offload, K = 1..4); the separate N = K run of the same
+    # checkpoint differs from it only by the fading draws (0.5 dB at 10 dB).
     fig, ax = new_figure()
     draw(ax, series, X_SNR, Y_PSNR)
     ax.set_xlabel("SNR (dB)"); ax.set_ylabel("PSNR (dB)"); ax.grid(True, alpha=0.3)
@@ -234,11 +239,12 @@ d = sel("masking_var", L, None, SNR_OP)
 if d:
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["masking_var8"], **STYLE["masking_var8"])
 draw(ax, [("wh_dynamic", L, None), ("todma", N_MAIN, None)], X_K, Y_PSNR, snr=SNR_OP)
-for scheme in ("deepma",):                  # retrained at N = K: one marker per population
-    d = [r for r in rows if r["scheme"] == scheme and r["snr"] == SNR_OP and r["designed"] == r["active"]]
-    d = sorted(d, key=lambda r: r["active"])
-    if d:
-        ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL[scheme], **STYLE[scheme])
+# DeepMA held fixed at its N = 8 training load and evaluated at K = 1..8, the
+# fixed-model counterpart of the PSMA and learned-mask curves (author's
+# decision, 2026-09-04; the retrained N = K values remain in Table VI).
+d = sel("deepma_offload", L, None, SNR_OP)
+if d:
+    ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["deepma8"], **STYLE["deepma8"])
 ax.set_xlabel("Active users $K$ ($N=%d$)" % L); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
@@ -276,6 +282,10 @@ def row(label, scheme, designed=None, nk=False):
     for K in COLS:
         if nk:
             d = [r for r in rows if r["scheme"] == scheme and r["designed"] == r["active"] == K and r["snr"] == snr]
+            if scheme == "deepma" and K in (N_MAIN, L):
+                # the N = 4 and N = 8 pairs at their own load: quote the same run
+                # the fixed-model rows quote, so one checkpoint has one number
+                d = sel("deepma_offload", K, K, snr)
         else:
             d = sel(scheme, designed, K, snr)
         cells.append("%.1f" % d[0]["psnr"] if d else "---")
@@ -286,13 +296,30 @@ for snr in (SNR_OP, 20):
     print("\n%% Table VI rows at %d dB" % snr)
     print(row("PSMA, $N{=}4$", "psma", N_MAIN))
     print(row("PSMA, $N{=}8$", "psma", L))
-    print(row("Masks, $N{=}4$", "masking_var", N_MAIN))
-    print(row("Masks, $N{=}8$", "masking_var", L))
-    print(row("DeepMA, $N{=}K$", "deepma", nk=True))
-    print(row("Dynamic WH-OMA", "wh_dynamic", L))
-    print(row("Static OMA", "oma_static", N_MAIN))
-    print(row("DeepMA, off-load", "deepma_offload", N_MAIN))
-    print(row("Token signatures", "todma", N_MAIN))
+    print(row(LBL["wh_dynamic"], "wh_dynamic", L))
+    print(row("Learned masks, $N{=}4$", "masking_var", N_MAIN))
+    print(row("Learned masks, $N{=}8$", "masking_var", L))
+    print(row(LBL["todma"], "todma", N_MAIN))
+    print(row(LBL["deepma"], "deepma", nk=True))
+    print(row(LBL["deepma8"], "deepma_offload", L))
+    print(row(LBL["deepma_offload"], "deepma_offload", N_MAIN))
+    print(row(LBL["oma_static"], "oma_static", N_MAIN))
+
+
+def ser_row(label, scheme, designed, snr=SNR_OP):
+    cells = []
+    for K in range(1, L + 1):
+        d = sel(scheme, designed, K, snr)
+        cells.append("%.2f" % d[0]["ser"] if d else "---")
+    return "%s & %s \\\\" % (label, " & ".join(cells))
+
+
+print("\n%% Table VII SER rows at %d dB, K = 1..8" % SNR_OP)
+for label, scheme, designed in (("PSMA, $N{=}4$", "psma", N_MAIN), ("PSMA, $N{=}8$", "psma", L),
+                                (LBL["wh_dynamic"], "wh_dynamic", L), ("Learned masks, $N{=}8$", "masking_var", L),
+                                (LBL["todma"], "todma", N_MAIN), (LBL["deepma8"], "deepma_offload", L),
+                                (LBL["deepma_offload"], "deepma_offload", N_MAIN), (LBL["oma_static"], "oma_static", N_MAIN)):
+    print(ser_row(label, scheme, designed))
 # ---- Fig. 2 (Sec. V-B): trained masks of the mask-based chain, per-user squared
 # mask profile and overlap matrix (data/masks.csv, dumped by dump_artifacts.py).
 # Own canvas (4.0 x 2.05 in, included at 0.80 columnwidth, print scale 0.70):
@@ -366,7 +393,7 @@ if os.path.exists(PREFIX):
         if r:
             pts.append((b, r[0]["psnr"]))
     if pts:
-        ax.plot([p[0] for p in pts], [p[1] for p in pts], label="Dynamic WH-OMA", **STYLE["wh_dynamic"])
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL["wh_dynamic"], **STYLE["wh_dynamic"])
     ax.set_xlabel("Prefix length $b$ (symbols per token, one user, %d dB)" % SNR_OP); ax.set_ylabel("PSNR (dB)")
     ax.set_xticks(range(1, L + 1)); ax.grid(True, alpha=0.3)
     guard_and_save(fig, ax, "fig_prefix.pdf", legend_below(fig, ax))

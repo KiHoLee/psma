@@ -107,13 +107,14 @@ Tables VI (PSNR), VII (SER), and VIII (SSIM) quote `data/ser_eval.csv` and
 n_images`. Scheme names and the legend label each carries in the paper:
 `psma` ("PSMA" and "PSMA, N=8"), `masking_var` ("Learned masks" and "Learned
 masks, N=8"), `oma_static` ("Static OMA"), `wh_dynamic` ("WH masks, per-rate heads"),
-`deepma` ("DeepMA, N=K"), `deepma_offload` ("DeepMA, off-load"), `todma`
+`deepma` ("DeepMA, N=K", retrained per population), `deepma_offload` (the N=4 and N=8 pairs held fixed at every K up to N: "DeepMA, N=4", "DeepMA, N=8"), `todma`
 ("Token signatures"); the file also keeps `masking_fixed` (masks retrained
 at N = K), `oma` (orthogonal heads retrained at N = K), and `prog_v1` (the
 first PSMA prototype), which the paper does not show, and the `clean` row
 (the classifier's error on the source crops). Partial runs merged into this
 file are kept raw as `data/ser_eval_wh_raw.csv`, `data/ser_eval_psma_raw.csv`,
-and `data/ser_eval_prog_raw.csv`. SER is the fraction of delivered
+`data/ser_eval_prog_raw.csv`, and `data/ser_eval_deepma8_raw.csv` (the N=8
+DeepMA pairs at K = 1..8, `ser_eval.py --deepma8_only`). SER is the fraction of delivered
 images whose ResNet-50 (ImageNet weights, logits restricted to the ten
 Imagenette classes) prediction differs from the label.
 
