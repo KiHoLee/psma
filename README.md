@@ -12,9 +12,9 @@ Walsh-Hadamard matrix (disjoint code sets, zero interference for K <= L, no
 idle dimension at any K), and its receiver despreads with the same rows.
 Variable-load training of the prefix rule is nested dropout; a per-prefix
 term trains every prefix length in every step. Compared on one frame with
-static OMA, dynamic Walsh-Hadamard OMA (adaptive orthogonal allocation), OMA
-retrained per population, mask-based shared-embedding superposition, DeepMA,
-and a token-signature reference, by PSNR, SSIM, a classifier-based semantic
+static OMA, dynamic Walsh-Hadamard OMA (adaptive orthogonal allocation),
+mask-based shared-embedding superposition, DeepMA, and a token-signature
+reference, by PSNR, SSIM, a classifier-based semantic
 error rate, and semantic throughput.
 
 ## Layout
@@ -63,8 +63,8 @@ python code/todma_train.py --l_s 8 --v 256 --epochs 15      # token-signature VQ
 # --- evaluation ---
 python code/ser_eval.py   --out data/ser_eval.csv        # PSNR + SER, every chain, K = 1..8, all SNRs
 #   (--prog_only / --wh_only evaluate just the PSMA / dynamic WH-OMA chains for merging)
-python code/prefix_eval.py --out data/prefix_eval.csv    # PSMA quality vs prefix length (Fig. 8)
-python code/ssim_eval.py  --out data/ssim_eval.csv       # SSIM at 10 dB, N = 4 (Table VII)
+python code/prefix_eval.py --out data/prefix_eval.csv    # PSMA quality vs prefix length (Fig. 6)
+python code/ssim_eval.py  --out data/ssim_eval.csv       # SSIM at 10 dB, N = 4 (Table VIII)
 python code/dump_artifacts.py                            # masks.csv, mux_weights.csv, param_counts.csv
 
 # --- figures and the load-table rows (reads only data/) ---
@@ -77,8 +77,8 @@ python code/plot_results.py
 |---|---|
 | `swinsc_ov_u{4,8}_psma` | `--users N --mask prog --var_load --multi_prefix --load_cond` (PSMA, one model per N) |
 | `swinsc_ov_u{4,8}var_learned` | `--users N --mask learned --var_load` (mask-based, one model per N) |
-| `swinsc_ov_u{2,4,6,8}_learned` | `--users N --mask learned` (mask-based, retrained at N = K) |
-| `swinsc_ov_u{1,2,4,8}_oma` | `--users N --mask oma` (re-encoded OMA heads, B = 8/N; also the dynamic WH-OMA heads) |
+| `swinsc_ov_u{2,4,6,8}_learned` | `--users N --mask learned` (mask-based, retrained at N = K; evaluated as `masking_fixed`, not shown in the paper) |
+| `swinsc_ov_u{1,2,4,8}_oma` | `--users N --mask oma` (orthogonal heads with block size B = 8/N; the N = 4 head is static OMA, and all four are the heads of dynamic WH-OMA; the per-population `oma` rows are not shown in the paper) |
 | `swinsc_ov_u{2,4,6,8}_deepma` | `--users N --mask deepma` (one encoder-decoder pair per user) |
 | `todma_v256` | `todma_train.py --l_s 8 --v 256` |
 | `swinsc_ov_u8_prog` | first PSMA prototype without the per-prefix term and prefix conditioning (scheme `prog_v1`, not in the paper) |
@@ -97,24 +97,23 @@ batch 24 per user, 20 epochs, seed 0.
 | `fig_load4.pdf` | PSNR vs K on the N = 4 frame at 10 dB (Fig. 3) | `data/ser_eval.csv` |
 | `fig_snr_k1.pdf` | PSNR vs SNR with one user (Fig. 4) | `data/ser_eval.csv` |
 | `fig_snr_k4.pdf` | PSNR vs SNR at full load N = K = 4 (Fig. 5) | `data/ser_eval.csv` |
-| `fig_load8.pdf` | one model across K = 1..8 (Fig. 6) | `data/ser_eval.csv` |
-| `fig_throughput.pdf` | semantic throughput vs K (Fig. 7) | `data/ser_eval.csv` |
-| `fig_prefix.pdf` | PSMA quality vs prefix length (Fig. 8) | `data/prefix_eval.csv`, `data/ser_eval.csv` |
+| `fig_prefix.pdf` | PSMA quality vs prefix length (Fig. 6) | `data/prefix_eval.csv`, `data/ser_eval.csv` |
+| `fig_load8.pdf` | one model across K = 1..8 (Fig. 7) | `data/ser_eval.csv` |
+| `fig_throughput.pdf` | semantic throughput vs K (Fig. 8) | `data/ser_eval.csv` |
 
-Tables V (PSNR), VI (SER), and VII (SSIM) quote `data/ser_eval.csv` and
-`data/ssim_eval.csv`; `code/plot_results.py` prints the Table V rows.
+Tables VI (PSNR), VII (SER), and VIII (SSIM) quote `data/ser_eval.csv` and
+`data/ssim_eval.csv`; `code/plot_results.py` prints the Table VI rows.
 `data/ser_eval.csv` columns: `scheme, designed, active, snr, psnr, ser,
-n_images`. Scheme names: `psma` (legend "PSMA (one model)"), `psma_tf`
-(the N = 8 PSMA model beyond the frame dimension, K = 9..16, on real
-harmonic tight-frame signatures with the matched filter, which equals the
-LMMSE combiner up to a scalar; no retraining), `masking_var` (legend "Masks
-(one model)"), `masking_fixed` ("Masks, N=K"), `oma`, `oma_static`,
-`wh_dynamic`, `deepma`, `deepma_offload`, `todma` (K = 1..16), `prog_v1`,
-and the `clean` row (the classifier's error on the source crops). Partial
-runs merged into this file are kept raw as `data/ser_eval_wh_raw.csv`,
-`data/ser_eval_psma_raw.csv`, `data/ser_eval_overload_raw.csv`.
-`data/overload_sinr.csv` is the Monte Carlo check of the tight-frame SINR
-closed form (measured vs formula at |h|^2 = 1, K = 9..16). SER is the fraction of delivered
+n_images`. Scheme names and the legend label each carries in the paper:
+`psma` ("PSMA" and "PSMA, N=8"), `masking_var` ("Masks" and "Masks,
+N=8"), `oma_static` ("Static OMA"), `wh_dynamic` ("Dynamic WH-OMA"),
+`deepma` ("DeepMA, N=K"), `deepma_offload` ("DeepMA, off-load"), `todma`
+("Token signatures"); the file also keeps `masking_fixed` (masks retrained
+at N = K), `oma` (orthogonal heads retrained at N = K), and `prog_v1` (the
+first PSMA prototype), which the paper does not show, and the `clean` row
+(the classifier's error on the source crops). Partial runs merged into this
+file are kept raw as `data/ser_eval_wh_raw.csv`, `data/ser_eval_psma_raw.csv`,
+and `data/ser_eval_prog_raw.csv`. SER is the fraction of delivered
 images whose ResNet-50 (ImageNet weights, logits restricted to the ten
 Imagenette classes) prediction differs from the label.
 

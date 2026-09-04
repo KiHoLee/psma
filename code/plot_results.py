@@ -5,7 +5,7 @@ of every chain at every load and SNR, one source for every number in the
 manuscript) and writes the five result figures to fig/ as vector PDF with
 one shared geometry. Every population, operating point and axis label
 comes from code/config_main.py. It also prints the rows of the load table
-(Table V) so the manuscript quotes the same file the figures draw.
+(Table VI) so the manuscript quotes the same file the figures draw.
 
 Geometry: every result figure is authored on a 6.8 x 5.3 in canvas with an
 8:6 axes box and its legend INSIDE the axes (author's request), placed by a
@@ -62,17 +62,15 @@ AXRECT = [0.145, 0.13, 0.835, 0.80]       # 8:6 axes (5.68 x 4.24 in); the legen
 # entries (9.1: one scheme, one style); so do the N = 8 mask-based model and
 # its N = 4 counterpart.
 LBL = {
-    "psma": "PSMA (one model)",
-    "psma8": "PSMA (one model), $N{=}8$",
-    "masking_var": "Masks (one model)",
-    "masking_var8": "Masks (one model), $N{=}8$",
-    "masking_fixed": "Masks, $N{=}K$",
+    "psma": "PSMA",
+    "psma8": "PSMA, $N{=}8$",
+    "masking_var": "Masks",
+    "masking_var8": "Masks, $N{=}8$",
     "oma_static": "Static OMA",
     "wh_dynamic": "Dynamic WH-OMA",
-    "oma": "Re-encoded OMA, $N{=}K$",
     "deepma": "DeepMA, $N{=}K$",
     "deepma_offload": "DeepMA, off-load",
-    "todma": "Token signatures (genie)",
+    "todma": "Token signatures",
 }
 # One (color, marker, line style) triple per scheme, never overridden per
 # figure: proposed = solid, single-model conventional = dashed, reallocated
@@ -83,17 +81,15 @@ STYLE = {
     "psma8": dict(color="#d95f02", marker="o", ls="-", mfc="none", mew=1.6),
     "masking_var": dict(color="#e6a02a", marker="s", ls="--"),
     "masking_var8": dict(color="#e6a02a", marker="s", ls="--", mfc="none", mew=1.6),
-    "masking_fixed": dict(color="#e6a02a", marker="s", ls="-", mfc="none", mew=1.6),
     "oma_static": dict(color="#1b5d99", marker="v", ls="--"),
     "wh_dynamic": dict(color="#1b5d99", marker="P", ls=":"),
-    "oma": dict(color="#1b5d99", marker="^", ls="-", mfc="none", mew=1.6),
     "deepma": dict(color="#1b9e77", marker="D", ls="-", mfc="none", mew=1.6),
     "deepma_offload": dict(color="#1b9e77", marker="D", ls="--"),
     "todma": dict(color="#7570b3", marker="d", ls="-."),
 }
 # one declared order for legends (tables in main.tex follow the same order)
-ORDER = ["psma", "psma8", "masking_var", "masking_var8", "masking_fixed", "oma_static",
-         "wh_dynamic", "oma", "deepma", "deepma_offload", "todma"]
+ORDER = ["psma", "psma8", "masking_var", "masking_var8", "oma_static",
+         "wh_dynamic", "deepma", "deepma_offload", "todma"]
 ORDER_LBL = [LBL[k] for k in ORDER]
 
 rows = list(csv.DictReader(open(DATA)))
@@ -217,7 +213,7 @@ for name, K, series in (
         ("fig_snr_k1.pdf", 1, [("psma", N_MAIN, 1), ("masking_var", N_MAIN, 1), ("oma_static", N_MAIN, 1),
                                ("wh_dynamic", L, 1), ("deepma_offload", N_MAIN, 1), ("todma", N_MAIN, 1)]),
         ("fig_snr_k4.pdf", N_MAIN, [("psma", N_MAIN, N_MAIN), ("masking_var", N_MAIN, N_MAIN),
-                                    ("masking_fixed", N_MAIN, N_MAIN), ("oma_static", N_MAIN, N_MAIN),
+                                    ("oma_static", N_MAIN, N_MAIN),
                                     ("wh_dynamic", L, N_MAIN), ("deepma", N_MAIN, N_MAIN),
                                     ("todma", N_MAIN, N_MAIN)])):
     fig, ax = new_figure()
@@ -238,12 +234,12 @@ d = sel("masking_var", L, None, SNR_OP)
 if d:
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["masking_var8"], **STYLE["masking_var8"])
 draw(ax, [("wh_dynamic", L, None), ("todma", N_MAIN, None)], X_K, Y_PSNR, snr=SNR_OP)
-for scheme in ("oma", "masking_fixed", "deepma"):           # retrained at N = K: one marker per population
+for scheme in ("deepma",):                  # retrained at N = K: one marker per population
     d = [r for r in rows if r["scheme"] == scheme and r["snr"] == SNR_OP and r["designed"] == r["active"]]
     d = sorted(d, key=lambda r: r["active"])
     if d:
         ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL[scheme], **STYLE[scheme])
-ax.set_xlabel("Active users $K$ (one model, $N=%d$)" % L); ax.set_ylabel("PSNR (dB)")
+ax.set_xlabel("Active users $K$ ($N=%d$)" % L); ax.set_ylabel("PSNR (dB)")
 ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
 
@@ -266,15 +262,12 @@ for scheme, designed, cap in (("psma", L, None), ("masking_var", L, None),
         print("skipping (no data yet): throughput,", scheme); continue
     key = {"psma": "psma8", "masking_var": "masking_var8"}.get(scheme, scheme)   # the N = 8 models
     ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[key], **STYLE[key]); drawn += 1
-d = [r for r in rows if r["scheme"] == "oma" and r["snr"] == SNR_OP and r["designed"] == r["active"]]
-d = sorted(d, key=lambda r: r["active"])
-ax.plot([r["active"] for r in d], [r["active"] * (1 - r["ser"]) for r in d], label=LBL["oma"], **STYLE["oma"])
 ax.set_xlabel("Active users $K$"); ax.set_ylabel(r"Throughput $\Theta(K)$ (images/frame)")
 ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 y0, y1 = ax.get_ylim(); ax.set_ylim(0.0, y1)
 guard_and_save(fig, ax, "fig_throughput.pdf", legend_below(fig, ax))
 
-# ---- Table V rows (PSNR at 10 and 20 dB, K = 1, 2, 3, 4, 6, 8) -----------------------
+# ---- Table VI rows (PSNR at 10 and 20 dB, K = 1, 2, 3, 4, 6, 8) -----------------------
 COLS = (1, 2, 3, 4, 6, 8)
 
 
@@ -290,18 +283,16 @@ def row(label, scheme, designed=None, nk=False):
 
 
 for snr in (SNR_OP, 20):
-    print("\n%% Table V rows at %d dB" % snr)
-    print(row("PSMA (one model), $N{=}4$", "psma", N_MAIN))
-    print(row("PSMA (one model), $N{=}8$", "psma", L))
-    print(row("Masked superposition (one model), $N{=}4$", "masking_var", N_MAIN))
-    print(row("Masked superposition (one model), $N{=}8$", "masking_var", L))
-    print(row("Masked superposition, $N{=}K$", "masking_fixed", nk=True))
-    print(row("Re-encoded OMA, $N{=}K$", "oma", nk=True))
+    print("\n%% Table VI rows at %d dB" % snr)
+    print(row("PSMA, $N{=}4$", "psma", N_MAIN))
+    print(row("PSMA, $N{=}8$", "psma", L))
+    print(row("Masks, $N{=}4$", "masking_var", N_MAIN))
+    print(row("Masks, $N{=}8$", "masking_var", L))
     print(row("DeepMA, $N{=}K$", "deepma", nk=True))
     print(row("Dynamic WH-OMA", "wh_dynamic", L))
     print(row("Static OMA", "oma_static", N_MAIN))
     print(row("DeepMA, off-load", "deepma_offload", N_MAIN))
-    print(row("Token signatures (genie)", "todma", N_MAIN))
+    print(row("Token signatures", "todma", N_MAIN))
 # ---- Fig. 2 (Sec. V-B): trained masks of the mask-based chain, per-user squared
 # mask profile and overlap matrix (data/masks.csv, dumped by dump_artifacts.py).
 # Own canvas (4.0 x 2.05 in, included at 0.80 columnwidth, print scale 0.70):
