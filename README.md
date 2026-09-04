@@ -12,8 +12,8 @@ Walsh-Hadamard matrix (disjoint code sets, zero interference for K <= L, no
 idle dimension at any K), and its receiver despreads with the same rows.
 Variable-load training of the prefix rule is nested dropout; a per-prefix
 term trains every prefix length in every step. Compared on one frame with
-static OMA, dynamic Walsh-Hadamard OMA (adaptive orthogonal allocation),
-mask-based shared-embedding superposition, DeepMA, and a token-signature
+static OMA, dynamically assigned Walsh-Hadamard masks (adaptive orthogonal
+allocation), learned-mask shared-embedding superposition, DeepMA, and a token-signature
 reference, by PSNR, SSIM, a classifier-based semantic
 error rate, and semantic throughput.
 
@@ -105,8 +105,8 @@ Tables VI (PSNR), VII (SER), and VIII (SSIM) quote `data/ser_eval.csv` and
 `data/ssim_eval.csv`; `code/plot_results.py` prints the Table VI rows.
 `data/ser_eval.csv` columns: `scheme, designed, active, snr, psnr, ser,
 n_images`. Scheme names and the legend label each carries in the paper:
-`psma` ("PSMA" and "PSMA, N=8"), `masking_var` ("Masks" and "Masks,
-N=8"), `oma_static` ("Static OMA"), `wh_dynamic` ("Dynamic WH-OMA"),
+`psma` ("PSMA" and "PSMA, N=8"), `masking_var` ("Learned masks" and "Learned
+masks, N=8"), `oma_static` ("Static OMA"), `wh_dynamic` ("WH masks, dynamic"),
 `deepma` ("DeepMA, N=K"), `deepma_offload` ("DeepMA, off-load"), `todma`
 ("Token signatures"); the file also keeps `masking_fixed` (masks retrained
 at N = K), `oma` (orthogonal heads retrained at N = K), and `prog_v1` (the
@@ -128,7 +128,7 @@ Imagenette classes) prediction differs from the label.
 - Semantic throughput T(K) = sum over served users of (1 - SER). A scheme
   provisioned for N users serves min(K, N); static OMA and DeepMA rows for
   K > N repeat their K = N value.
-- Dynamic WH-OMA: pool of 8 length-8 Walsh-Hadamard codes, B = 8/K codes
+- WH masks, dynamic (dynamic WH-OMA): pool of 8 length-8 Walsh-Hadamard rows, B = 8/K codes
   per user (largest power of two below 8/K otherwise), idle-code power
   reused, re-encoded OMA head per code count.
 - The receiver's per-user `reduce` projection is a plain linear layer (an

@@ -64,10 +64,10 @@ AXRECT = [0.145, 0.13, 0.835, 0.80]       # 8:6 axes (5.68 x 4.24 in); the legen
 LBL = {
     "psma": "PSMA",
     "psma8": "PSMA, $N{=}8$",
-    "masking_var": "Masks",
-    "masking_var8": "Masks, $N{=}8$",
+    "masking_var": "Learned masks",
+    "masking_var8": "Learned masks, $N{=}8$",
     "oma_static": "Static OMA",
-    "wh_dynamic": "Dynamic WH-OMA",
+    "wh_dynamic": "WH masks, dynamic",
     "deepma": "DeepMA, $N{=}K$",
     "deepma_offload": "DeepMA, off-load",
     "todma": "Token signatures",
@@ -88,8 +88,8 @@ STYLE = {
     "todma": dict(color="#7570b3", marker="d", ls="-."),
 }
 # one declared order for legends (tables in main.tex follow the same order)
-ORDER = ["psma", "psma8", "masking_var", "masking_var8", "oma_static",
-         "wh_dynamic", "deepma", "deepma_offload", "todma"]
+ORDER = ["psma", "psma8", "wh_dynamic", "masking_var", "masking_var8",
+         "todma", "deepma", "deepma_offload", "oma_static"]
 ORDER_LBL = [LBL[k] for k in ORDER]
 
 rows = list(csv.DictReader(open(DATA)))
