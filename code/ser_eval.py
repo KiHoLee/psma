@@ -53,10 +53,6 @@ p.add_argument("--wh_only", action="store_true",
                help="evaluate only the clean floor and the dynamic WH chain (rows to be merged into ser_eval.csv)")
 p.add_argument("--prog_only", action="store_true",
                help="evaluate only the clean floor and the progressive-spread prototype (research note)")
-p.add_argument("--overload_only", action="store_true",
-               help="evaluate only the clean floor, the PSMA tight-frame extension beyond the frame "
-                    "dimension (K = L+1..nmax, scheme psma_tf) and the token-signature chain at those loads; "
-                    "run with --nmax 16")
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
@@ -117,7 +113,7 @@ def pair(name):
 
 
 def eval_chain(name, scheme, designed, actives):
-    if a.wh_only or a.overload_only or (a.prog_only and not scheme.startswith(("prog", "psma"))):
+    if a.wh_only or (a.prog_only and not scheme.startswith(("prog", "psma"))):
         return
     pr = pair(name)
     if pr is None:
@@ -208,7 +204,7 @@ def hadamard(n):
 
 L_E = MAIN["L"]
 Hn = hadamard(L_E).to(dev)
-for K in (range(1, min(a.nmax, L_E) + 1) if not (a.prog_only or a.overload_only) else []):
+for K in (range(1, min(a.nmax, L_E) + 1) if not a.prog_only else []):
     Bc = 1 << ((L_E // K).bit_length() - 1)            # largest power of two <= L_e/K
     pr = pair("swinsc_ov_u%d_oma" % (L_E // Bc))
     if pr is None:
@@ -236,82 +232,6 @@ for K in (range(1, min(a.nmax, L_E) + 1) if not (a.prog_only or a.overload_only)
                     ps.append(psnr(out, xs[j]).cpu())
                     errs.append((predict(out).cpu() != labels[u][b:b + 25]))
         record("wh_dynamic", L_E, K, s, ps, errs)
-
-# ---- PSMA beyond the frame dimension (2026-09-04): tight-frame signatures + LMMSE --
-# For K > L no orthonormal assignment exists. Every active user sends the FIRST
-# symbol of its progressive code (b = 1) on a unit-norm real harmonic tight
-# frame S in R^{L x K}, S S^T = (K/L) I, the frame is normalized to unit power
-# per dimension (so each symbol carries power L/K), and receiver k combines with
-# the LMMSE vector W_k = (S S^T + sigma^2/|h|^2 I)^{-1} s_k, which for a tight
-# frame is a positive scalar times s_k, so the matched filter s_k^T z and the
-# LMMSE combiner deliver the same SINR; the matched filter is used because it
-# leaves the symbol at the unit scale the decoder was trained on. The N = 8 PSMA
-# model is used WITHOUT retraining: its b = 1 prefix and prefix-length
-# conditioning were trained at K = 5..8, and users beyond eight reuse the
-# eight trained decoders cyclically (all decoders share one training recipe).
-# A companion Monte Carlo at |h|^2 = 1 (AWGN) records the post-combining SINR
-# against the closed form P / (P (K/L - 1) + sigma^2) with P the measured
-# per-symbol power, the check the writing standard asks for (6.6).
-def harmonic_frame(L, K):
-    m = torch.arange(1, L // 2 + 1, dtype=torch.float64).view(-1, 1)
-    k = torch.arange(K, dtype=torch.float64).view(1, -1)
-    ang = 2 * torch.pi * m * k / K
-    S = torch.cat([torch.cos(ang), torch.sin(ang)], 0) * (2.0 / L) ** 0.5   # (L, K), unit-norm columns
-    G = S @ S.t()
-    assert torch.allclose(G, (K / L) * torch.eye(L, dtype=torch.float64), atol=1e-9), "not a tight frame"
-    return S.float()
-
-
-if a.overload_only and os.path.exists(os.path.join(CK, "swinsc_ov_u8_psma", "tx.pt")):
-    cfg8, tx8, rx8 = pair("swinsc_ov_u8_psma")
-    sinr_rows = []
-    for K in range(L_E + 1, a.nmax + 1):
-        S = harmonic_frame(L_E, K).to(dev)                     # (L, K)
-        act = list(range(K))
-        for s in a.snrs + ["sinr"]:
-            ch = Channel("awgn", 10.0) if s == "sinr" else Channel("rayleigh", s)
-            ps, errs = [], []
-            sig_p, int_p, noi_p, sym_p = 0.0, 0.0, 0.0, 0.0
-            with torch.no_grad():
-                for b in range(0, a.n, 25):
-                    xs = [imgs[u][b:b + 25].to(dev) for u in act]
-                    syms, hw = [], None
-                    for j, u in enumerate(act):
-                        e, hw = tx8.encode_user(xs[j], u % cfg8.users)
-                        syms.append(e[..., :1])                # (B, T, 1) first symbol
-                    X = torch.cat(syms, -1)                    # (B, T, K)
-                    fr = X @ S.t()                             # (B, T, L) superposed frame
-                    pw = fr.reshape(fr.shape[0], -1).pow(2).mean(1).sqrt().clamp_min(1e-8).view(-1, 1, 1)
-                    f = fr / pw
-                    z = ch(f)
-                    if s == "sinr":
-                        n = z - f
-                        for j in range(K):
-                            sk = S[:, j]
-                            sig = (X[..., j:j + 1] / pw) * 1.0      # own symbol after unit-norm MF
-                            intf = (f @ sk).unsqueeze(-1) - sig
-                            noi = (n @ sk).unsqueeze(-1)
-                            sig_p += sig.pow(2).mean().item(); int_p += intf.pow(2).mean().item()
-                            noi_p += noi.pow(2).mean().item(); sym_p += sig.pow(2).mean().item()
-                        continue
-                    for j, u in enumerate(act):
-                        y = torch.nn.functional.pad((z @ S[:, j]).unsqueeze(-1), (0, L_E - 1))
-                        d = u % cfg8.users
-                        dec = rx8.decoders[d]
-                        out = dec(rx8.reduce[d](y), hw, **({"K": 1} if dec.cond is not None else {}))
-                        ps.append(psnr(out, xs[j]).cpu())
-                        errs.append((predict(out).cpu() != labels[u][b:b + 25]))
-            if s == "sinr":
-                nb = (a.n // 25) * K
-                P = sym_p / nb; sigma2 = 10 ** (-10.0 / 10)
-                meas = 10 * torch.log10(torch.tensor(sig_p / (int_p + noi_p))).item()
-                form = 10 * torch.log10(torch.tensor(P / (P * (K / L_E - 1) + sigma2))).item()
-                sinr_rows.append([K, round(P, 5), round(meas, 3), round(form, 3)])
-                print("sinr check K=%d P=%.4f meas=%.3f dB formula=%.3f dB" % (K, P, meas, form), flush=True)
-            else:
-                record("psma_tf", cfg8.users, K, s, ps, errs)
-    with open(os.path.join(os.path.dirname(a.out), "overload_sinr.csv"), "w", newline="") as fo:
-        w = csv.writer(fo); w.writerow(["active", "symbol_power", "sinr_meas_db", "sinr_formula_db"]); w.writerows(sinr_rows)
 
 # ---- token signatures (genie), same code path as tsp_eval.py ------------------------
 st = torch.load(os.path.join(CK, "todma_v256", "model.pt"), map_location=dev)
@@ -342,8 +262,7 @@ def omp(z, K):
     return torch.stack(picked, 1)
 
 
-for K in ([] if (a.wh_only or a.prog_only) else
-          (range(L_E + 1, a.nmax + 1) if a.overload_only else range(1, a.nmax + 1))):
+for K in (range(1, a.nmax + 1) if not (a.wh_only or a.prog_only) else []):
     act = list(range(K))
     for s in a.snrs:
         ch = Channel("rayleigh", s)

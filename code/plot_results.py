@@ -7,9 +7,9 @@ one shared geometry. Every population, operating point and axis label
 comes from code/config_main.py. It also prints the rows of the load table
 (Table V) so the manuscript quotes the same file the figures draw.
 
-Geometry: every result figure is authored on a 6.8 x 6.2 in canvas with an
-8:6 axes box and its legend BELOW the axes (six or seven entries do not fit
-inside the axes of a column-width print without stretching the y axis) and
+Geometry: every result figure is authored on a 6.8 x 5.3 in canvas with an
+8:6 axes box and its legend INSIDE the axes (author's request), placed by a
+corner sweep with y-axis headroom so that no curve point lies under it, and
 is included at 0.95 columnwidth, so every authored font prints at
 0.95 * 252 / (6.8 * 72) = 0.49 of itself: ticks and legend 15.5 -> 7.6 pt,
 axis labels 16 -> 7.8 pt. Guards (standard 12.7): every label and the legend box are checked
@@ -39,12 +39,12 @@ DATA = os.path.join(ROOT, "data", "ser_eval.csv")
 FIG = os.path.join(ROOT, "fig")
 os.makedirs(FIG, exist_ok=True)
 
-# Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 6.5 in) and
+# Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 5.3 in) and
 # one axes box of 5.68 x 4.24 in (8:6), included at 0.95 columnwidth (239 pt),
 # so the print scale is 239 / (6.8 * 72) = 0.49 and the authored 15.5 pt
-# fonts print at 7.6 pt (ticks, legend) and 16 pt labels at 7.8 pt. The band
-# below the axes holds the x label and a two-column legend.
-TW, TH = 6.8, 6.5
+# fonts print at 7.6 pt (ticks, legend) and 16 pt labels at 7.8 pt. The
+# legend sits inside the axes (author's request) with y-axis headroom.
+TW, TH = 6.8, 5.3
 plt.rcParams.update({
     "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 15.5,
     "lines.markersize": 7.0, "lines.linewidth": 1.8,
@@ -53,7 +53,7 @@ plt.rcParams.update({
     "legend.handletextpad": 0.4, "legend.borderpad": 0.3,
     "legend.borderaxespad": 0.3, "legend.framealpha": 0.9,
 })
-AXRECT = [0.145, 0.33, 0.835, 0.652]      # 8:6 axes (5.68 x 4.24 in); the band below holds the x label and the legend
+AXRECT = [0.145, 0.13, 0.835, 0.80]       # 8:6 axes (5.68 x 4.24 in); the legend sits inside the axes
 
 # one shared label dictionary (7.2); every value is echoed verbatim in main.tex.
 # The N = 4 and N = 8 PSMA models are two trained networks and carry two
@@ -113,14 +113,41 @@ def new_figure():
     return fig, fig.add_axes(AXRECT)
 
 
-def legend_below(fig, ax, ncol=2):
-    """Two-column legend in the band below the axes, entries in the declared ORDER (9.2)."""
+def legend_clear(fig, ax, leg, pad=4):
+    """True when the legend box lies inside the axes and no curve point lies under it."""
+    fig.canvas.draw()
+    lb = leg.get_window_extent(); ab = ax.get_window_extent()
+    if lb.x0 < ab.x0 or lb.y0 < ab.y0 or lb.x1 > ab.x1 or lb.y1 > ab.y1:
+        return False
+    for ln in ax.get_lines():
+        for x, y in ax.transData.transform(list(zip(ln.get_xdata(), ln.get_ydata()))):
+            if lb.x0 - pad < x < lb.x1 + pad and lb.y0 - pad < y < lb.y1 + pad:
+                return False
+    return True
+
+
+def legend_inside(fig, ax, ncol=1):
+    """Legend INSIDE the axes box (author's request, 2026-09-04), entries in
+    the declared ORDER (9.2). Placement sweeps the corners first at a small
+    y-axis headroom and then raises the headroom, so the legend never covers
+    a curve point (9.4); one column keeps the box narrower than the axes."""
     handles, labels = ax.get_legend_handles_labels()
     pairs = sorted(zip(handles, labels),
                    key=lambda hl: ORDER_LBL.index(hl[1]) if hl[1] in ORDER_LBL else len(ORDER_LBL))
-    return ax.legend([h for h, _ in pairs], [l for _, l in pairs], loc="upper center",
-                     bbox_to_anchor=(0.5, 0.235), ncol=ncol, bbox_transform=fig.transFigure,
-                     columnspacing=0.6)
+    hs, ls = [h for h, _ in pairs], [l for _, l in pairs]
+    y0, y1 = ax.get_ylim()
+    locs = ("upper left", "upper right", "lower right", "lower left", "center right", "center left")
+    for f in (0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.65, 0.80, 1.0):
+        for loc in locs:
+            ax.set_ylim(y0, y1 + f * (y1 - y0))
+            leg = ax.legend(hs, ls, loc=loc, ncol=ncol)
+            if legend_clear(fig, ax, leg):
+                return leg
+    ax.set_ylim(y0, y1)
+    raise RuntimeError("no clean legend placement found")
+
+
+legend_below = legend_inside     # every figure calls legend_below(fig, ax)
 
 
 def guard_and_save(fig, ax, name, legend):
@@ -140,9 +167,6 @@ def guard_and_save(fig, ax, name, legend):
     lb = legend.get_window_extent()
     if lb.x0 < 0 or lb.y0 < 0 or lb.x1 > fw or lb.y1 > fh:
         raise RuntimeError(f"{name}: legend leaves canvas: {lb} vs {fw}x{fh}")
-    xl = ax.xaxis.label.get_window_extent()
-    if lb.y1 > xl.y0 - 2:
-        raise RuntimeError(f"{name}: legend top {lb.y1:.0f} overlaps the x label bottom {xl.y0:.0f}")
     pad = 4
     for ln in ax.get_lines():
         for x, y in ax.transData.transform(list(zip(ln.get_xdata(), ln.get_ydata()))):
@@ -201,11 +225,11 @@ for name, K, series in (
 
 # ---- Fig. 5: one model across eight loads --------------------------------------
 fig, ax = new_figure()
-# Beyond K = L the PSMA model continues with tight-frame signatures (scheme
-# psma_tf, same model, no retraining): drawn as the SAME series, so the curve
-# runs from K = 1 to the largest evaluated load, while every capped chain ends.
-KMAX = max([r["active"] for r in rows if r["scheme"] == "psma_tf"] + [L])
-d = sel("psma", L, None, SNR_OP) + sel("psma_tf", L, None, SNR_OP)
+# The figures stop at K = L (author's decision, 2026-09-04): the K = 9..16
+# tight-frame rows (scheme psma_tf) stay in data/ser_eval.csv as author
+# material and are not drawn.
+KMAX = L
+d = sel("psma", L, None, SNR_OP)
 if d:
     ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["psma8"], **STYLE["psma8"])
 d = sel("masking_var", L, None, SNR_OP)
@@ -226,18 +250,14 @@ guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
 # stop at their K = N value (the author's convention, 2026-09-03).
 fig, ax = new_figure()
 drawn = 0
-# beyond K = L: the PSMA model continues on tight-frame signatures (psma_tf),
-# the mask-based N = 8 model and dynamic WH-OMA stop at eight (cap L), the
-# N = 4 designs at four; the token-signature chain admits any K
-for scheme, designed, cap, ext in (("psma", L, None, "psma_tf"), ("masking_var", L, L, None),
-                                   ("oma_static", N_MAIN, N_MAIN, None), ("deepma_offload", N_MAIN, N_MAIN, None),
-                                   ("wh_dynamic", L, L, None), ("todma", N_MAIN, None, None)):
+# the N = 4 designs stop at four (cap N_MAIN); every other chain runs to K = L
+for scheme, designed, cap in (("psma", L, None), ("masking_var", L, None),
+                              ("oma_static", N_MAIN, N_MAIN), ("deepma_offload", N_MAIN, N_MAIN),
+                              ("wh_dynamic", L, None), ("todma", N_MAIN, None)):
     pts = []
     for K in range(1, KMAX + 1):
         Ke = min(K, cap) if cap else K
         d = sel(scheme, designed, Ke, SNR_OP)
-        if not d and ext:
-            d = sel(ext, designed, Ke, SNR_OP)
         if d:
             pts.append((K, Ke * (1.0 - d[0]["ser"])))
     if len(pts) < 2:
