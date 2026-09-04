@@ -7,12 +7,12 @@ one shared geometry. Every population, operating point and axis label
 comes from code/config_main.py. It also prints the rows of the load table
 (Table V) so the manuscript quotes the same file the figures draw.
 
-Geometry: every result figure is authored on a 6.8 x 3.0 in canvas with its
-legend BELOW the axes (six or seven entries do not fit inside the axes of a
-column-width print without stretching the y axis) and is included at
-0.95 columnwidth, so every authored font prints at 0.95 * 252 / (6.8 * 72)
-= 0.49 of itself: ticks 14 -> 6.8 pt, labels 14.5 -> 7.1 pt, legend 13 ->
-6.4 pt. Guards (standard 12.7): every label and the legend box are checked
+Geometry: every result figure is authored on a 6.8 x 6.2 in canvas with an
+8:6 axes box and its legend BELOW the axes (six or seven entries do not fit
+inside the axes of a column-width print without stretching the y axis) and
+is included at 0.95 columnwidth, so every authored font prints at
+0.95 * 252 / (6.8 * 72) = 0.49 of itself: ticks and legend 15.5 -> 7.6 pt,
+axis labels 16 -> 7.8 pt. Guards (standard 12.7): every label and the legend box are checked
 against the canvas and every curve point against the legend box.
 
     python code/plot_results.py
@@ -39,22 +39,32 @@ DATA = os.path.join(ROOT, "data", "ser_eval.csv")
 FIG = os.path.join(ROOT, "fig")
 os.makedirs(FIG, exist_ok=True)
 
-TW, TH = 6.8, 3.45
+# Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 6.5 in) and
+# one axes box of 5.68 x 4.24 in (8:6), included at 0.95 columnwidth (239 pt),
+# so the print scale is 239 / (6.8 * 72) = 0.49 and the authored 15.5 pt
+# fonts print at 7.6 pt (ticks, legend) and 16 pt labels at 7.8 pt. The band
+# below the axes holds the x label and a two-column legend.
+TW, TH = 6.8, 6.5
 plt.rcParams.update({
-    "font.size": 14.0, "axes.labelsize": 14.5, "legend.fontsize": 13.0,
-    "lines.markersize": 6.5, "lines.linewidth": 1.7,
-    "pdf.fonttype": 42, "figure.figsize": (TW, TH),
+    "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 15.5,
+    "lines.markersize": 7.0, "lines.linewidth": 1.8,
+    "pdf.fonttype": 42, "figure.figsize": (TW, TH), "mathtext.fontset": "cm",
     "legend.labelspacing": 0.25, "legend.handlelength": 1.6,
     "legend.handletextpad": 0.4, "legend.borderpad": 0.3,
     "legend.borderaxespad": 0.3, "legend.framealpha": 0.9,
 })
-AXRECT = [0.125, 0.50, 0.855, 0.48]       # axes; the band below holds the x label and the legend
+AXRECT = [0.145, 0.33, 0.835, 0.652]      # 8:6 axes (5.68 x 4.24 in); the band below holds the x label and the legend
 
-# one shared label dictionary (7.2); every value is echoed verbatim in main.tex
+# one shared label dictionary (7.2); every value is echoed verbatim in main.tex.
+# The N = 4 and N = 8 PSMA models are two trained networks and carry two
+# entries (9.1: one scheme, one style); so do the N = 8 mask-based model and
+# its N = 4 counterpart.
 LBL = {
     "psma": "PSMA (one model)",
-    "masking_var": "Masked superposition (one model)",
-    "masking_fixed": "Masked superposition, $N{=}K$",
+    "psma8": "PSMA (one model), $N{=}8$",
+    "masking_var": "Masks (one model)",
+    "masking_var8": "Masks (one model), $N{=}8$",
+    "masking_fixed": "Masks, $N{=}K$",
     "oma_static": "Static OMA",
     "wh_dynamic": "Dynamic WH-OMA",
     "oma": "Re-encoded OMA, $N{=}K$",
@@ -62,17 +72,27 @@ LBL = {
     "deepma_offload": "DeepMA, off-load",
     "todma": "Token signatures (genie)",
 }
+# One (color, marker, line style) triple per scheme, never overridden per
+# figure: proposed = solid, single-model conventional = dashed, reallocated
+# reference = dotted, chains retrained per population = solid with open
+# markers, token signatures = dash-dot.
 STYLE = {
     "psma": dict(color="#d95f02", marker="o", ls="-"),
+    "psma8": dict(color="#d95f02", marker="o", ls="-", mfc="none", mew=1.6),
     "masking_var": dict(color="#e6a02a", marker="s", ls="--"),
-    "masking_fixed": dict(color="#e6a02a", marker="s", ls="none", mfc="none", mew=1.5),
+    "masking_var8": dict(color="#e6a02a", marker="s", ls="--", mfc="none", mew=1.6),
+    "masking_fixed": dict(color="#e6a02a", marker="s", ls="-", mfc="none", mew=1.6),
     "oma_static": dict(color="#1b5d99", marker="v", ls="--"),
     "wh_dynamic": dict(color="#1b5d99", marker="P", ls=":"),
-    "oma": dict(color="#1b5d99", marker="^", ls="none"),
-    "deepma": dict(color="#1b9e77", marker="D", ls="none"),
-    "deepma_offload": dict(color="#1b9e77", marker="D", ls="-"),
+    "oma": dict(color="#1b5d99", marker="^", ls="-", mfc="none", mew=1.6),
+    "deepma": dict(color="#1b9e77", marker="D", ls="-", mfc="none", mew=1.6),
+    "deepma_offload": dict(color="#1b9e77", marker="D", ls="--"),
     "todma": dict(color="#7570b3", marker="d", ls="-."),
 }
+# one declared order for legends (tables in main.tex follow the same order)
+ORDER = ["psma", "psma8", "masking_var", "masking_var8", "masking_fixed", "oma_static",
+         "wh_dynamic", "oma", "deepma", "deepma_offload", "todma"]
+ORDER_LBL = [LBL[k] for k in ORDER]
 
 rows = list(csv.DictReader(open(DATA)))
 for r in rows:
@@ -94,8 +114,13 @@ def new_figure():
 
 
 def legend_below(fig, ax, ncol=2):
-    return ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.33), ncol=ncol,
-                     bbox_transform=fig.transFigure, columnspacing=0.6)
+    """Two-column legend in the band below the axes, entries in the declared ORDER (9.2)."""
+    handles, labels = ax.get_legend_handles_labels()
+    pairs = sorted(zip(handles, labels),
+                   key=lambda hl: ORDER_LBL.index(hl[1]) if hl[1] in ORDER_LBL else len(ORDER_LBL))
+    return ax.legend([h for h, _ in pairs], [l for _, l in pairs], loc="upper center",
+                     bbox_to_anchor=(0.5, 0.235), ncol=ncol, bbox_transform=fig.transFigure,
+                     columnspacing=0.6)
 
 
 def guard_and_save(fig, ax, name, legend):
@@ -170,26 +195,30 @@ for name, K, series in (
                                     ("wh_dynamic", L, N_MAIN), ("deepma", N_MAIN, N_MAIN),
                                     ("todma", N_MAIN, N_MAIN)])):
     fig, ax = new_figure()
-    # at full load the retrained chains are single points per SNR: draw them as lines
-    for scheme in ("masking_fixed", "oma", "deepma"):
-        STYLE[scheme] = dict(STYLE[scheme]); STYLE[scheme]["ls"] = "-"
     draw(ax, series, X_SNR, Y_PSNR)
-    for scheme in ("masking_fixed", "oma", "deepma"):
-        STYLE[scheme]["ls"] = "none"
     ax.set_xlabel("SNR (dB)"); ax.set_ylabel("PSNR (dB)"); ax.grid(True, alpha=0.3)
     guard_and_save(fig, ax, name, legend_below(fig, ax))
 
 # ---- Fig. 5: one model across eight loads --------------------------------------
 fig, ax = new_figure()
-series = [("psma", L, None), ("masking_var", L, None), ("wh_dynamic", L, None), ("todma", N_MAIN, None)]
-draw(ax, series, X_K, Y_PSNR, snr=SNR_OP)
+# Beyond K = L the PSMA model continues with tight-frame signatures (scheme
+# psma_tf, same model, no retraining): drawn as the SAME series, so the curve
+# runs from K = 1 to the largest evaluated load, while every capped chain ends.
+KMAX = max([r["active"] for r in rows if r["scheme"] == "psma_tf"] + [L])
+d = sel("psma", L, None, SNR_OP) + sel("psma_tf", L, None, SNR_OP)
+if d:
+    ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["psma8"], **STYLE["psma8"])
+d = sel("masking_var", L, None, SNR_OP)
+if d:
+    ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL["masking_var8"], **STYLE["masking_var8"])
+draw(ax, [("wh_dynamic", L, None), ("todma", N_MAIN, None)], X_K, Y_PSNR, snr=SNR_OP)
 for scheme in ("oma", "masking_fixed", "deepma"):           # retrained at N = K: one marker per population
     d = [r for r in rows if r["scheme"] == scheme and r["snr"] == SNR_OP and r["designed"] == r["active"]]
     d = sorted(d, key=lambda r: r["active"])
     if d:
         ax.plot([r["active"] for r in d], [r["psnr"] for r in d], label=LBL[scheme], **STYLE[scheme])
 ax.set_xlabel("Active users $K$ (one model, $N=%d$)" % L); ax.set_ylabel("PSNR (dB)")
-ax.set_xticks(range(1, L + 1)); ax.grid(True, alpha=0.3)
+ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
 
 # ---- Fig. 6: semantic throughput T(K) = sum over served users of (1 - SER) -----
@@ -197,22 +226,29 @@ guard_and_save(fig, ax, "fig_load8.pdf", legend_below(fig, ax))
 # stop at their K = N value (the author's convention, 2026-09-03).
 fig, ax = new_figure()
 drawn = 0
-for scheme, designed, cap in (("psma", L, None), ("masking_var", L, None), ("oma_static", N_MAIN, N_MAIN),
-                              ("deepma_offload", N_MAIN, N_MAIN), ("wh_dynamic", L, None), ("todma", N_MAIN, None)):
+# beyond K = L: the PSMA model continues on tight-frame signatures (psma_tf),
+# the mask-based N = 8 model and dynamic WH-OMA stop at eight (cap L), the
+# N = 4 designs at four; the token-signature chain admits any K
+for scheme, designed, cap, ext in (("psma", L, None, "psma_tf"), ("masking_var", L, L, None),
+                                   ("oma_static", N_MAIN, N_MAIN, None), ("deepma_offload", N_MAIN, N_MAIN, None),
+                                   ("wh_dynamic", L, L, None), ("todma", N_MAIN, None, None)):
     pts = []
-    for K in range(1, L + 1):
+    for K in range(1, KMAX + 1):
         Ke = min(K, cap) if cap else K
         d = sel(scheme, designed, Ke, SNR_OP)
+        if not d and ext:
+            d = sel(ext, designed, Ke, SNR_OP)
         if d:
             pts.append((K, Ke * (1.0 - d[0]["ser"])))
     if len(pts) < 2:
         print("skipping (no data yet): throughput,", scheme); continue
-    ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[scheme], **STYLE[scheme]); drawn += 1
+    key = {"psma": "psma8", "masking_var": "masking_var8"}.get(scheme, scheme)   # the N = 8 models
+    ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[key], **STYLE[key]); drawn += 1
 d = [r for r in rows if r["scheme"] == "oma" and r["snr"] == SNR_OP and r["designed"] == r["active"]]
 d = sorted(d, key=lambda r: r["active"])
 ax.plot([r["active"] for r in d], [r["active"] * (1 - r["ser"]) for r in d], label=LBL["oma"], **STYLE["oma"])
-ax.set_xlabel("Active users $K$"); ax.set_ylabel("Throughput $T(K)$")
-ax.set_xticks(range(1, L + 1)); ax.grid(True, alpha=0.3)
+ax.set_xlabel("Active users $K$"); ax.set_ylabel(r"Throughput $\Theta(K)$ (images/frame)")
+ax.set_xticks(range(1, KMAX + 1)); ax.grid(True, alpha=0.3)
 y0, y1 = ax.get_ylim(); ax.set_ylim(0.0, y1)
 guard_and_save(fig, ax, "fig_throughput.pdf", legend_below(fig, ax))
 
@@ -244,7 +280,7 @@ for snr in (SNR_OP, 20):
     print(row("Static OMA", "oma_static", N_MAIN))
     print(row("DeepMA, off-load", "deepma_offload", N_MAIN))
     print(row("Token signatures (genie)", "todma", N_MAIN))
-# ---- Fig. 7 (Sec. V-B): trained masks of the mask-based chain, per-user squared
+# ---- Fig. 2 (Sec. V-B): trained masks of the mask-based chain, per-user squared
 # mask profile and overlap matrix (data/masks.csv, dumped by dump_artifacts.py).
 # Own canvas (4.0 x 2.05 in, included at 0.80 columnwidth, print scale 0.70):
 # authored 12 / 10.7 pt print at 8.4 / 7.5 pt.
@@ -297,18 +333,17 @@ if os.path.exists(MASKS):
     fig.savefig(os.path.join(FIG, "fig_masks.pdf")); plt.close(fig)
     print("wrote fig_masks.pdf")
 
-# ---- Fig. 8 (Sec. VI): quality of the progressive code versus prefix length,
+# ---- Fig. 6 (Sec. VI-C): quality of the progressive code versus prefix length,
 # one user alone on the frame (data/prefix_eval.csv from code/prefix_eval.py)
 PREFIX = os.path.join(ROOT, "data", "prefix_eval.csv")
 if os.path.exists(PREFIX):
     prow = list(csv.DictReader(open(PREFIX)))
     fig, ax = new_figure()
-    for name, d, st in (("PSMA (one model), $N{=}4$", 4, dict(color="#d95f02", marker="o", ls="-")),
-                        ("PSMA (one model), $N{=}8$", 8, dict(color="#d95f02", marker="o", ls="--", mfc="none", mew=1.5))):
+    for key, d in (("psma", 4), ("psma8", 8)):
         pts = sorted([(int(r["prefix"]), float(r["psnr"])) for r in prow
                       if int(r["designed"]) == d and int(r["snr"]) == SNR_OP])
         if pts:
-            ax.plot([p[0] for p in pts], [p[1] for p in pts], label=name, **st)
+            ax.plot([p[0] for p in pts], [p[1] for p in pts], label=LBL[key], **STYLE[key])
     # reference: the stand-alone head trained for b symbols at unit symbol power
     # is the dynamic WH-OMA point with K = L / b users (B = b codes each), so the
     # heads B = 1, 2, 4, 8 sit at b = 1, 2, 4, 8

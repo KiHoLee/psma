@@ -104,10 +104,17 @@ batch 24 per user, 20 epochs, seed 0.
 Tables V (PSNR), VI (SER), and VII (SSIM) quote `data/ser_eval.csv` and
 `data/ssim_eval.csv`; `code/plot_results.py` prints the Table V rows.
 `data/ser_eval.csv` columns: `scheme, designed, active, snr, psnr, ser,
-n_images`. Scheme names: `psma`, `masking_var` (mask-based, one model),
-`masking_fixed` (mask-based, N = K), `oma`, `oma_static`, `wh_dynamic`,
-`deepma`, `deepma_offload`, `todma`, `prog_v1`, and the `clean` row (the
-classifier's error on the source crops). SER is the fraction of delivered
+n_images`. Scheme names: `psma` (legend "PSMA (one model)"), `psma_tf`
+(the N = 8 PSMA model beyond the frame dimension, K = 9..16, on real
+harmonic tight-frame signatures with the matched filter, which equals the
+LMMSE combiner up to a scalar; no retraining), `masking_var` (legend "Masks
+(one model)"), `masking_fixed` ("Masks, N=K"), `oma`, `oma_static`,
+`wh_dynamic`, `deepma`, `deepma_offload`, `todma` (K = 1..16), `prog_v1`,
+and the `clean` row (the classifier's error on the source crops). Partial
+runs merged into this file are kept raw as `data/ser_eval_wh_raw.csv`,
+`data/ser_eval_psma_raw.csv`, `data/ser_eval_overload_raw.csv`.
+`data/overload_sinr.csv` is the Monte Carlo check of the tight-frame SINR
+closed form (measured vs formula at |h|^2 = 1, K = 9..16). SER is the fraction of delivered
 images whose ResNet-50 (ImageNet weights, logits restricted to the ten
 Imagenette classes) prediction differs from the label.
 

@@ -34,6 +34,10 @@ p.add_argument("--resume", action="store_true")
 p.add_argument("--amp", action="store_true", help="bf16 autocast")
 p.add_argument("--load_cond", action="store_true", help="FiLM-condition the Swin body on the active count (learned_k family)")
 p.add_argument("--var_load", action="store_true", help="train with a random number of ACTIVE users per step (underload-robust)")
+p.add_argument("--accum", type=int, default=1, help="gradient accumulation: forward/backward each per-user batch in this many interleaved sub-batches, one optimizer step per full batch (same effective batch, less memory)")
+p.add_argument("--multi_prefix", action="store_true",
+               help="progressive-spread chain: add the nested-dropout term of the manuscript (eq. L_prefix), one random "
+                    "active user alone on the frame decoded from prefixes b in {1,2,4,...,L}, in every step")
 a = p.parse_args()
 
 random.seed(a.seed); torch.manual_seed(a.seed)
@@ -79,10 +83,31 @@ for ep in range(start, a.epochs):
     for batches in zip(*loaders):
         imgs = [b[0].to(dev) for b in batches]
         act = sorted(random.sample(range(cfg.users), random.randint(1, cfg.users))) if a.var_load else None
-        outs, act = run(imgs, random.uniform(a.snr_min, a.snr_max), act)
-        loss = sum(F.mse_loss(o, imgs[u]) for o, u in zip(outs, act)) / len(act)
-        opt.zero_grad(set_to_none=True); loss.backward()
-        torch.nn.utils.clip_grad_norm_(uniq, MAIN["GRAD_CLIP"]); opt.step(); sched.step(); tot += loss.item()
+        snr = random.uniform(a.snr_min, a.snr_max)          # one load and one SNR per optimizer step
+        opt.zero_grad(set_to_none=True)
+        for j in range(a.accum):                            # accum=1: exactly the original single pass
+            sub = [im[j::a.accum] for im in imgs]           # interleaved, equal-sized sub-batches
+            outs, act_j = run(sub, snr, act)
+            loss = sum(F.mse_loss(o, sub[u]) for o, u in zip(outs, act_j)) / len(act_j) / a.accum
+            if a.multi_prefix:
+                # nested-dropout term (manuscript eq. L_prefix): one active user
+                # alone on the frame, its L-symbol code decoded from every
+                # power-of-two prefix, so the importance ordering of the late
+                # symbols is trained in every step and not only when the drawn
+                # load happens to be small
+                from swinsc.mask_mux import power_normalize
+                u = random.choice(act_j); L = cfg.l_e
+                with torch.autocast("cuda", dtype=torch.bfloat16, enabled=a.amp):
+                    e, hw = tx.encode_user(sub[u], u)
+                    aux, nb, b = 0.0, 0, 1
+                    while b <= L:
+                        Kb = L // b                               # b symbols <=> the first user of a load L/b
+                        zb = ch(power_normalize(tx.spreader.spread(e, 0, Kb)).float(), snr)
+                        aux = aux + F.mse_loss(rx(zb, u, hw, K=Kb, active=[u]).float(), sub[u]); nb += 1
+                        b *= 2
+                loss = loss + aux / nb / a.accum
+            loss.backward(); tot += loss.item()
+        torch.nn.utils.clip_grad_norm_(uniq, MAIN["GRAD_CLIP"]); opt.step(); sched.step()
     tx.eval(); rx.eval(); ps = {s: [] for s in (0, 10, 20)}
     with torch.no_grad():
         for i, (x, _) in enumerate(test):

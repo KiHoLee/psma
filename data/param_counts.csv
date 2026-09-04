@@ -10,3 +10,7 @@ deepma_u4,rx_total_allusers,4767000
 todma_v256,enc,1192154
 todma_v256,dec,1191678
 todma_v256,codebook,2048
+psma_u4,tx_total,1192226
+psma_u4,rx_total_allusers,4844056
+psma_u8,tx_total,1192226
+psma_u8,rx_total_allusers,9688112
