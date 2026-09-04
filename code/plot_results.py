@@ -358,7 +358,7 @@ if os.path.exists(MASKS):
             axb.text(v, u, f"{beta[u][v]:.1f}", ha="center", va="center", fontsize=12.0,
                      color="white" if beta[u][v] >= 1.6 else "black")
     cb = fig.colorbar(im0, ax=axm, fraction=0.046, pad=0.04)
-    cb.ax.set_title("$m_u^2(i)$", fontsize=12.0, pad=3)
+    cb.ax.set_title("$m_u(i)^2$", fontsize=12.0, pad=3)
     cb.ax.tick_params(labelsize=12.0)
     fig.subplots_adjust(left=0.135, right=0.97, top=0.855, bottom=0.285, wspace=0.55)
     fig.canvas.draw()
