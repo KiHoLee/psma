@@ -38,6 +38,9 @@ p.add_argument("--accum", type=int, default=1, help="gradient accumulation: forw
 p.add_argument("--multi_prefix", action="store_true",
                help="progressive-spread chain: add the nested-dropout term of the manuscript (eq. L_prefix), one random "
                     "active user alone on the frame decoded from prefixes b in {1,2,4,...,L}, in every step")
+p.add_argument("--all_prefix", action="store_true",
+               help="with --multi_prefix: visit EVERY prefix length b = 1..L in the nested-dropout term "
+                    "(author request 2026-09-04), not only the powers of two")
 a = p.parse_args()
 
 random.seed(a.seed); torch.manual_seed(a.seed)
@@ -99,12 +102,27 @@ for ep in range(start, a.epochs):
                 u = random.choice(act_j); L = cfg.l_e
                 with torch.autocast("cuda", dtype=torch.bfloat16, enabled=a.amp):
                     e, hw = tx.encode_user(sub[u], u)
-                    aux, nb, b = 0.0, 0, 1
-                    while b <= L:
-                        Kb = L // b                               # b symbols <=> the first user of a load L/b
-                        zb = ch(power_normalize(tx.spreader.spread(e, 0, Kb)).float(), snr)
-                        aux = aux + F.mse_loss(rx(zb, u, hw, K=Kb, active=[u]).float(), sub[u]); nb += 1
-                        b *= 2
+                    aux, nb = 0.0, 0
+                    lengths = range(1, L + 1) if a.all_prefix else [b for b in (1, 2, 4, 8, 16, 32) if b <= L]
+                    for b in lengths:
+                        if a.all_prefix:
+                            # direct prefix path: the first b ordered symbols on the
+                            # first b rows of Q at unit frame power, despread and
+                            # zero-padded, decoded with the FiLM index b (the same
+                            # computation as prefix_eval.py); lengths that no load
+                            # produces (5, 6, 7 at L = 8) are trained too, so the
+                            # code is nested at every length, not only at the
+                            # lengths the prefix rule visits
+                            Q = tx.spreader.Q
+                            zb = ch(power_normalize(e[..., :b] @ Q[:b]).float(), snr)
+                            y = F.pad(zb @ Q[:b].T, (0, L - b))
+                            dec = rx.decoders[u]
+                            out = dec(rx.reduce[u](y), hw, **({"K": b} if dec.cond is not None else {}))
+                        else:
+                            Kb = L // b                           # b symbols <=> the first user of a load L/b
+                            zb = ch(power_normalize(tx.spreader.spread(e, 0, Kb)).float(), snr)
+                            out = rx(zb, u, hw, K=Kb, active=[u])
+                        aux = aux + F.mse_loss(out.float(), sub[u]); nb += 1
                 loss = loss + aux / nb / a.accum
             loss.backward(); tot += loss.item()
         torch.nn.utils.clip_grad_norm_(uniq, MAIN["GRAD_CLIP"]); opt.step(); sched.step()

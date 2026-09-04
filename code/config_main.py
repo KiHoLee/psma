@@ -41,6 +41,8 @@ MAIN = {
     "DATASET": "imagenette",
     "CROP": 128,                  # center-crop side in pixels
     "VAL_IMAGES": 200,            # validation images per user per point
+    "EVAL_REPS": 5,               # independent fading draws per image (common random
+                                  # numbers across schemes; author request 2026-09-04)
 
     # --- training -----------------------------------------------------------
     "EPOCHS": (20, 20),           # per-model budget; all compared chains ran 20
@@ -167,7 +169,7 @@ def table_iv_expectations():
         "vocabulary": "%d /" % MAIN["VOCAB"],
         "seed": "%d (models), %d (signatures)" % (MAIN["SEED"], MAIN["SIGNATURE_SEED"]),
         "gradient clipping": "$%s$ \\\\" % ("%g" % MAIN["GRAD_CLIP"] if MAIN["GRAD_CLIP"] != 1.0 else "1.0"),
-        "validation images": "%d per point" % MAIN["VAL_IMAGES"],
+        "validation images": "%d per point, %d fading draws each" % (MAIN["VAL_IMAGES"], MAIN["EVAL_REPS"]),
         "crop": "$%d^2$ center crop" % MAIN["CROP"],
         "encoder": "Swin, %d stages, widths (%s)"
                    % (MAIN["STAGES"], ", ".join(str(d) for d in MAIN["DIMS"])),

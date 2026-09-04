@@ -2,7 +2,7 @@
 
 Code, raw results, and figures for the manuscript *"Progressive-Spread
 Multiple Access: One Load-Adaptive Transceiver for Multi-User Semantic
-Communications"* (submitted to IEEE Transactions on Signal Processing,
+Communications"* (submitted to IEEE Transactions on Wireless Communications,
 September 2026).
 
 One shared Swin JSCC encoder emits an importance-ordered symbol vector per
@@ -12,8 +12,7 @@ Walsh-Hadamard matrix (disjoint code sets, zero interference for K <= L, no
 idle dimension at any K), and its receiver despreads with the same rows.
 Variable-load training of the prefix rule is nested dropout; a per-prefix
 term trains every prefix length in every step. Compared on one frame with
-static OMA, the same Walsh-Hadamard masks with a separately trained head per row count (adaptive orthogonal
-allocation), learned-mask shared-embedding superposition, DeepMA, and a token-signature
+static OMA, learned-mask shared-embedding superposition, DeepMA, and a token-signature
 reference, by PSNR, SSIM, a classifier-based semantic
 error rate, and semantic throughput.
 
@@ -42,14 +41,18 @@ and the workspace root (`SWINSC_ROOT`, default: the repository root).
 ## Reproducing the results
 
 All randomness is seeded (`seed = 0` for models, `2026` for the token
-signatures). One script per experiment; the plot script reads only `data/`.
+signatures). Every evaluation point averages 200 validation images per user,
+each transmitted under `EVAL_REPS = 5` independent fading draws whose seeds
+depend only on (load, SNR, draw, batch), never on the scheme, so every scheme
+is measured on the same channel realizations. One script per experiment;
+the plot script reads only `data/`.
 
 ```bash
 python code/prepare_imagenette.py                    # dataset -> data/imagenette160
 
 # --- proposed chain: one PSMA model per provisioned population ---
 python code/swin_train.py --dataset imagenette --img_size 128 --users 4 \
-    --mask prog --var_load --multi_prefix --load_cond --l_s 8 --beta 1 \
+    --mask prog --var_load --multi_prefix --all_prefix --load_cond --l_s 8 --beta 1 \
     --channel rayleigh --epochs 20 --amp --bs 24 --out checkpoints/swinsc_ov_u4_psma
 #   repeat with --users 8 --accum 4 -> checkpoints/swinsc_ov_u8_psma
 
@@ -64,7 +67,7 @@ python code/todma_train.py --l_s 8 --v 256 --epochs 15      # token-signature VQ
 python code/ser_eval.py   --out data/ser_eval.csv        # PSNR + SER, every chain, K = 1..8, all SNRs
 #   (--prog_only / --wh_only evaluate just the PSMA / dynamic WH-OMA chains for merging)
 python code/prefix_eval.py --out data/prefix_eval.csv    # PSMA quality vs prefix length (Fig. 6)
-python code/ssim_eval.py  --out data/ssim_eval.csv       # SSIM at 10 dB, N = 4 (Table VIII)
+python code/ssim_eval.py  --out data/ssim_eval.csv       # SSIM at 10 dB, N = 4 (Table VII)
 python code/dump_artifacts.py                            # masks.csv, mux_weights.csv, param_counts.csv
 
 # --- figures and the load-table rows (reads only data/) ---
@@ -75,7 +78,8 @@ python code/plot_results.py
 
 | Checkpoint | Flags |
 |---|---|
-| `swinsc_ov_u{4,8}_psma` | `--users N --mask prog --var_load --multi_prefix --load_cond` (PSMA, one model per N) |
+| `swinsc_ov_u{4,8}_psma` | `--users N --mask prog --var_load --multi_prefix --all_prefix --load_cond` (PSMA, one model per N; the per-prefix term visits every length b = 1..8; N = 4 trained with `--accum 2`, N = 8 with `--accum 8`) |
+| `swinsc_ov_u{4,8}_psma` (powers of two) | same flags without `--all_prefix` (term over b in {1,2,4,8}); drawn in Fig. 6 as "PSMA, powers of two" from `data/prefix_eval.csv` model `psma_pow2` |
 | `swinsc_ov_u{4,8}var_learned` | `--users N --mask learned --var_load` (mask-based, one model per N) |
 | `swinsc_ov_u{2,4,6,8}_learned` | `--users N --mask learned` (mask-based, retrained at N = K; evaluated as `masking_fixed`, not shown in the paper) |
 | `swinsc_ov_u{1,2,4,8}_oma` | `--users N --mask oma` (orthogonal heads with block size B = 8/N; the N = 4 head is static OMA, and all four are the heads of dynamic WH-OMA; the per-population `oma` rows are not shown in the paper) |
@@ -97,17 +101,19 @@ batch 24 per user, 20 epochs, seed 0.
 | `fig_load4.pdf` | PSNR vs K on the N = 4 frame at 10 dB (Fig. 3) | `data/ser_eval.csv` |
 | `fig_snr_k1.pdf` | PSNR vs SNR with one user (Fig. 4) | `data/ser_eval.csv` |
 | `fig_snr_k4.pdf` | PSNR vs SNR at full load N = K = 4 (Fig. 5) | `data/ser_eval.csv` |
-| `fig_prefix.pdf` | PSMA quality vs prefix length (Fig. 6) | `data/prefix_eval.csv`, `data/ser_eval.csv` |
+| `fig_prefix.pdf` | PSMA quality vs prefix length, ablation of the per-prefix term (Fig. 6) | `data/prefix_eval.csv` (models `psma`, `psma_pow2`, `prog_v1`) |
 | `fig_load8.pdf` | one model across K = 1..8 (Fig. 7) | `data/ser_eval.csv` |
 | `fig_throughput.pdf` | semantic throughput vs K (Fig. 8) | `data/ser_eval.csv` |
+| `fig_visual.pdf` | reconstructed images, N = 4 frame, K = 1 and 4 (Fig. 9) | `code/visual_eval.py` -> `data/visual/` |
 
-Tables VI (PSNR), VII (SER), and VIII (SSIM) quote `data/ser_eval.csv` and
-`data/ssim_eval.csv`; `code/plot_results.py` prints the Table VI rows.
+Tables VI (SER at 10 dB) and VII (SSIM) quote `data/ser_eval.csv` and
+`data/ssim_eval.csv`; `code/plot_results.py` prints the PSNR-across-load rows
+(no longer a manuscript table) and the Table VI rows.
 `data/ser_eval.csv` columns: `scheme, designed, active, snr, psnr, ser,
 n_images`. Scheme names and the legend label each carries in the paper:
 `psma` ("PSMA" and "PSMA, N=8"), `masking_var` ("Learned masks" and "Learned
-masks, N=8"), `oma_static` ("Static OMA"), `wh_dynamic` ("WH masks, per-rate heads"),
-`deepma` ("DeepMA, N=K", retrained per population), `deepma_offload` (the N=4 and N=8 pairs held fixed at every K up to N: "DeepMA, N=4", "DeepMA, N=8"), `todma`
+masks, N=8"), `oma_static` ("Static OMA"), `wh_dynamic` (dynamic WH-OMA with a head per row count; evaluated and kept in the file, not shown in the paper),
+`deepma_offload` (the N=4 and N=8 pairs held fixed at every K up to N: "DeepMA, N=4", "DeepMA, N=8"), `deepma` (pairs retrained at N = K, kept in the file, not shown in the paper), `todma`
 ("Token signatures"); the file also keeps `masking_fixed` (masks retrained
 at N = K), `oma` (orthogonal heads retrained at N = K), and `prog_v1` (the
 first PSMA prototype), which the paper does not show, and the `clean` row
@@ -141,5 +147,27 @@ Imagenette classes) prediction differs from the label.
 
 ## License / citation
 
-To be finalized upon publication. Until then the repository is shared for
-review purposes.
+To be finalized upon publication. License and citation entry are added on publication.
+
+## Reconstructed images (visual examples)
+
+`code/visual_eval.py` transmits the same three validation images through
+every scheme at 10 dB under one fixed Rayleigh block-fading realization
+(seed 2026), so the panels differ only by the access scheme and the load.
+Outputs under `data/visual/`: one PNG per scheme and load
+(`img<idx>/<scheme>_k<K>.png`, user 0's image), the originals, two montages
+per image, and `visual_psnr.csv` with the PSNR of every panel. The manuscript
+refers to these panels in Section VI-A; its tables carry the averages over
+200 images and 5 fading draws, so a single panel can lie above or below its
+table entry.
+
+N = 4 frame (PSMA, WH masks, learned masks, token signatures, DeepMA N=4, static OMA; the WH-mask panels are kept for reference, the paper does not report that scheme):
+
+![N=4 frame, image 7](data/visual/montage_N4_img7.png)
+
+N = 8 frame (PSMA N=8, WH masks, learned masks N=8, DeepMA N=8):
+
+![N=8 frame, image 7](data/visual/montage_N8_img7.png)
+
+The other two images are `montage_N4_img21.png`, `montage_N8_img21.png`,
+`montage_N4_img33.png`, and `montage_N8_img33.png` in the same folder.

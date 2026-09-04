@@ -16,13 +16,24 @@ from swinsc import Config, Transmitter, Receiver, Channel
 from swinsc.swin import SwinEncoder, SwinDecoder
 
 p = argparse.ArgumentParser()
-p.add_argument("--n", type=int, default=200)
+p.add_argument("--n", type=int, default=MAIN["VAL_IMAGES"])
+p.add_argument("--reps", type=int, default=MAIN["EVAL_REPS"],
+               help="independent fading draws per image (common across schemes)")
 p.add_argument("--snr", type=float, default=10.0)
 p.add_argument("--crop", type=int, default=128)
 p.add_argument("--out", default=wpath("data", "ssim_eval.csv"))
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+
+
+def batches():
+    return [(rep, b) for rep in range(a.reps) for b in range(0, a.n, 25)]
+
+
+def seed_fading(K, s, rep, b):
+    """Same common-random-number rule as ser_eval.py."""
+    torch.manual_seed(MAIN["SEED"] * 1_000_003 + K * 10_007 + (int(s) + 5) * 101 + rep * 13 + b // 25)
 CK = wpath("checkpoints")
 val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
@@ -73,8 +84,9 @@ def eval_masked(name, scheme, designed, actives):
         ch = Channel("rayleigh", a.snr)
         ps = []
         with torch.no_grad():
-            for b in range(0, a.n, 25):
+            for rep, b in batches():
                 xs = [imgs[u][b:b + 25].to(dev) for u in act]
+                seed_fading(K, a.snr, rep, b)
                 f, hw = tx(xs, active=act)
                 z = ch(f)
                 for j, u in enumerate(act):
@@ -86,7 +98,7 @@ def eval_masked(name, scheme, designed, actives):
 
 eval_masked("swinsc_ov_u4_learned", "masking_fixed", 4, [4])
 eval_masked("swinsc_ov_u4_oma", "oma", 4, [4])
-eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [4])
+eval_masked("swinsc_ov_u4_deepma", "deepma", 4, [1, 2, 3, 4])   # the N=4 pairs held fixed (Table VIII row "DeepMA, N=4")
 eval_masked("swinsc_ov_u4var_learned", "masking_var", 4, [1, 2, 3, 4])
 if os.path.exists(os.path.join(CK, "swinsc_ov_u4_psma", "tx.pt")):     # PSMA (2026-09-04)
     eval_masked("swinsc_ov_u4_psma", "psma", 4, [1, 2, 3, 4])
@@ -130,8 +142,9 @@ for K in (1, 2, 3, 4):
     ch = Channel("rayleigh", a.snr)
     ps = []
     with torch.no_grad():
-        for b in range(0, a.n, 25):
+        for rep, b in batches():
             xs = [imgs[u][b:b + 25].to(dev) for u in act]
+            seed_fading(K, a.snr, rep, b)
             qidx, f, hw = [], None, None
             for x in xs:
                 ssem, hw = enc(x)

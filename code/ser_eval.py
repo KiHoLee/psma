@@ -44,6 +44,8 @@ IMAGENET_IDS = [0, 217, 482, 491, 497, 566, 569, 571, 574, 701]   # ResNet-50 ou
 
 p = argparse.ArgumentParser()
 p.add_argument("--n", type=int, default=MAIN["VAL_IMAGES"])
+p.add_argument("--reps", type=int, default=MAIN["EVAL_REPS"],
+               help="independent fading draws per image (common across schemes)")
 p.add_argument("--snrs", type=float, nargs="+", default=list(MAIN["SNR_GRID"]))
 p.add_argument("--crop", type=int, default=MAIN["CROP"])
 p.add_argument("--nmax", type=int, default=8)
@@ -59,6 +61,22 @@ p.add_argument("--deepma8_only", action="store_true",
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+
+
+def batches():
+    """(repetition, first image index) of every 25-image batch under every
+    fading repetition: a.reps independent fading draws per image."""
+    return [(rep, b) for rep in range(a.reps) for b in range(0, a.n, 25)]
+
+
+def seed_fading(K, s, rep, b):
+    """Common random numbers (author request, 2026-09-04): the fading draws of
+    a batch depend only on (load, SNR, repetition, batch), never on the scheme,
+    so every scheme is measured on the same fading sequence and a difference
+    between two schemes is a paired comparison whose Monte Carlo spread is far
+    below that of either curve. Reseeding here is safe because nothing after
+    this call draws random numbers except the channel (evaluation mode)."""
+    torch.manual_seed(MAIN["SEED"] * 1_000_003 + K * 10_007 + (int(s) + 5) * 101 + rep * 13 + b // 25)
 CK = wpath("checkpoints")
 val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
@@ -130,8 +148,9 @@ def eval_chain(name, scheme, designed, actives):
             ch = Channel("rayleigh", s)
             ps, errs = [], []
             with torch.no_grad():
-                for b in range(0, a.n, 25):
+                for rep, b in batches():
                     xs = [imgs[u][b:b + 25].to(dev) for u in act]
+                    seed_fading(K, s, rep, b)
                     f, hw = tx(xs, active=act)
                     z = ch(f)
                     for j, u in enumerate(act):
@@ -226,8 +245,9 @@ for K in (range(1, min(a.nmax, L_E) + 1) if not (a.prog_only or a.deepma8_only) 
         ch = Channel("rayleigh", s)
         ps, errs = [], []
         with torch.no_grad():
-            for b in range(0, a.n, 25):
+            for rep, b in batches():
                 xs = [imgs[u][b:b + 25].to(dev) for u in act]
+                seed_fading(K, s, rep, b)
                 f, hw = None, None
                 for j, u in enumerate(act):
                     e, hw = tx.encode_user(xs[j], u)           # (B, N, Bc) symbols of user u
@@ -277,8 +297,9 @@ for K in (range(1, a.nmax + 1) if not (a.wh_only or a.prog_only or a.deepma8_onl
         ch = Channel("rayleigh", s)
         ps, errs = [], []
         with torch.no_grad():
-            for b in range(0, a.n, 25):
+            for rep, b in batches():
                 xs = [imgs[u][b:b + 25].to(dev) for u in act]
+                seed_fading(K, s, rep, b)
                 qidx, f, hw = [], None, None
                 for x in xs:
                     ssem, hw = enc(x)

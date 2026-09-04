@@ -1,15 +1,64 @@
-panel,psnr_db,snr_db,channel_seed
-ov_fixed_img7,17.814,10.0,2026
-ov_var_img7,18.224,10.0,2026
-ov_oma_img7,19.115,10.0,2026
-ov_todma_img7,9.976,10.0,2026
-ul_k1_img7,19.253,10.0,2026
-ul_k2_img7,19.172,10.0,2026
-ul_todma1_img7,20.826,10.0,2026
-ov_fixed_img21,17.02,10.0,2026
-ov_var_img21,17.146,10.0,2026
-ov_oma_img21,17.671,10.0,2026
-ov_todma_img21,8.696,10.0,2026
-ul_k1_img21,17.67,10.0,2026
-ul_k2_img21,17.552,10.0,2026
-ul_todma1_img21,19.351,10.0,2026
+image,frame,panel,psnr_db
+7,N4,"PSMA, K=1",21.31
+7,N4,"PSMA, K=2",20.49
+7,N4,"PSMA, K=4",18.51
+7,N4,"WH masks, K=1",23.24
+7,N4,"WH masks, K=4",19.19
+7,N4,"Learned masks, K=1",19.25
+7,N4,"Learned masks, K=4",18.22
+7,N4,"Token signatures, K=1",20.83
+7,N4,"Token signatures, K=2",10.62
+7,N4,"Token signatures, K=4",9.98
+7,N4,"DeepMA N=4, K=1",15.97
+7,N4,"DeepMA N=4, K=4",18.97
+7,N4,"Static OMA, any K",19.12
+7,N8,"PSMA N=8, K=1",20.56
+7,N8,"PSMA N=8, K=4",18.41
+7,N8,"PSMA N=8, K=8",16.13
+7,N8,"WH masks, K=8",16.95
+7,N8,"Learned masks N=8, K=1",16.9
+7,N8,"Learned masks N=8, K=8",16.04
+7,N8,"DeepMA N=8, K=1",10.03
+7,N8,"DeepMA N=8, K=8",16.96
+21,N4,"PSMA, K=1",19.45
+21,N4,"PSMA, K=2",18.79
+21,N4,"PSMA, K=4",16.86
+21,N4,"WH masks, K=1",22.11
+21,N4,"WH masks, K=4",17.7
+21,N4,"Learned masks, K=1",17.67
+21,N4,"Learned masks, K=4",17.15
+21,N4,"Token signatures, K=1",19.35
+21,N4,"Token signatures, K=2",9.23
+21,N4,"Token signatures, K=4",8.7
+21,N4,"DeepMA N=4, K=1",16.44
+21,N4,"DeepMA N=4, K=4",17.88
+21,N4,"Static OMA, any K",17.67
+21,N8,"PSMA N=8, K=1",19.03
+21,N8,"PSMA N=8, K=4",16.78
+21,N8,"PSMA N=8, K=8",15.72
+21,N8,"WH masks, K=8",15.97
+21,N8,"Learned masks N=8, K=1",15.6
+21,N8,"Learned masks N=8, K=8",15.37
+21,N8,"DeepMA N=8, K=1",10.52
+21,N8,"DeepMA N=8, K=8",15.94
+33,N4,"PSMA, K=1",27.44
+33,N4,"PSMA, K=2",26.45
+33,N4,"PSMA, K=4",23.62
+33,N4,"WH masks, K=1",30.06
+33,N4,"WH masks, K=4",25.01
+33,N4,"Learned masks, K=1",24.78
+33,N4,"Learned masks, K=4",23.99
+33,N4,"Token signatures, K=1",26.06
+33,N4,"Token signatures, K=2",10.29
+33,N4,"Token signatures, K=4",8.86
+33,N4,"DeepMA N=4, K=1",18.72
+33,N4,"DeepMA N=4, K=4",24.61
+33,N4,"Static OMA, any K",24.98
+33,N8,"PSMA N=8, K=1",26.48
+33,N8,"PSMA N=8, K=4",23.8
+33,N8,"PSMA N=8, K=8",22.19
+33,N8,"WH masks, K=8",22.41
+33,N8,"Learned masks N=8, K=1",21.93
+33,N8,"Learned masks N=8, K=8",21.43
+33,N8,"DeepMA N=8, K=1",11.78
+33,N8,"DeepMA N=8, K=8",22.52

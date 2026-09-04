@@ -24,12 +24,24 @@ from deepsc_ri.metrics import psnr
 
 p = argparse.ArgumentParser()
 p.add_argument("--n", type=int, default=MAIN["VAL_IMAGES"])
+p.add_argument("--reps", type=int, default=MAIN["EVAL_REPS"],
+               help="independent fading draws per image (common across prefix lengths and models)")
 p.add_argument("--snrs", type=float, nargs="+", default=list(MAIN["SNR_GRID"]))
 p.add_argument("--crop", type=int, default=MAIN["CROP"])
 p.add_argument("--out", default=wpath("data", "prefix_eval.csv"))
 a = p.parse_args()
 dev = MAIN_DEVICE()
 random.seed(MAIN["SEED"]); torch.manual_seed(MAIN["SEED"])
+
+
+def batches():
+    return [(rep, i) for rep in range(a.reps) for i in range(0, a.n, 25)]
+
+
+def seed_fading(K, s, rep, b):
+    """Same common-random-number rule as ser_eval.py (prefix length in the
+    role of the load), so every prefix and both models see one fading sequence."""
+    torch.manual_seed(MAIN["SEED"] * 1_000_003 + K * 10_007 + (int(s) + 5) * 101 + rep * 13 + b // 25)
 CK = wpath("checkpoints")
 val = sorted(glob.glob(wpath("data", "imagenette160", "val", "*", "*.png")))
 random.shuffle(val)
@@ -43,8 +55,19 @@ def load(path):
 
 imgs = torch.stack([load(val[i]) for i in range(a.n)])      # user 0's images, as in ser_eval.py
 rows = []
-for N in (4, 8):
-    d = os.path.join(CK, "swinsc_ov_u%d_psma" % N)
+# Ablation of the per-prefix term (author request, 2026-09-04): the PSMA
+# models trained with the term over every length b = 1..L (canonical names),
+# the earlier models whose term visited the powers of two only (parked under
+# checkpoints_psma_pow2_20260904/ by run_psma_all.sh), and the first
+# prototype trained without the term (scheme prog_v1). Missing checkpoints
+# are skipped, so the script runs before and after the retraining.
+POW2 = os.path.join(os.path.dirname(CK), "checkpoints_psma_pow2_20260904")
+MODELS = [("psma", 4, os.path.join(CK, "swinsc_ov_u4_psma")),
+          ("psma", 8, os.path.join(CK, "swinsc_ov_u8_psma")),
+          ("psma_pow2", 4, os.path.join(POW2, "swinsc_ov_u4_psma")),
+          ("psma_pow2", 8, os.path.join(POW2, "swinsc_ov_u8_psma")),
+          ("prog_v1", 8, os.path.join(CK, "swinsc_ov_u8_prog"))]
+for model, N, d in MODELS:
     if not os.path.exists(os.path.join(d, "tx.pt")):
         print("skip (no checkpoint):", d); continue
     cfg = Config.load(os.path.join(d, "config.json"))
@@ -55,8 +78,9 @@ for N in (4, 8):
         for s in a.snrs:
             ch = Channel("rayleigh", s); ps = []
             with torch.no_grad():
-                for i in range(0, a.n, 25):
+                for rep, i in batches():
                     x = imgs[i:i + 25].to(dev)
+                    seed_fading(b, s, rep, i)
                     e, hw = tx.encode_user(x, 0)                       # (B, T, L) ordered symbols
                     # prefix b on the first b rows at UNIT power per symbol, the
                     # power a user holding b codes has at load K = L/b in (8);
@@ -68,9 +92,9 @@ for N in (4, 8):
                     dec = rx.decoders[0]
                     out = dec(rx.reduce[0](y), hw, **({"K": b} if dec.cond is not None else {}))
                     ps.append(psnr(out, x).cpu())
-            rows.append([N, b, int(s), round(torch.cat(ps).mean().item(), 3)])
-            print("psma N=%d prefix=%d snr=%d psnr=%.2f" % (N, b, s, rows[-1][3]), flush=True)
+            rows.append([model, N, b, int(s), round(torch.cat(ps).mean().item(), 3)])
+            print("%s N=%d prefix=%d snr=%d psnr=%.2f" % (model, N, b, s, rows[-1][4]), flush=True)
 
 with open(a.out, "w", newline="") as fo:
-    w = csv.writer(fo); w.writerow(["designed", "prefix", "snr", "psnr"]); w.writerows(rows)
+    w = csv.writer(fo); w.writerow(["model", "designed", "prefix", "snr", "psnr"]); w.writerows(rows)
 print("saved", a.out, len(rows), "rows")
