@@ -11,8 +11,9 @@ Geometry: every result figure is authored on a 6.8 x 5.3 in canvas with an
 8:6 axes box and its legend INSIDE the axes (author's request), placed by a
 corner sweep with y-axis headroom so that no curve point lies under it, and
 is included at 0.95 columnwidth, so every authored font prints at
-0.95 * 252 / (6.8 * 72) = 0.49 of itself: ticks and legend 15.5 -> 7.6 pt,
-axis labels 16 -> 7.8 pt. Guards (standard 12.7): every label and the legend box are checked
+0.95 * 252 / (6.8 * 72) = 0.49 of itself: ticks 15.5 -> 7.6 pt, axis
+labels 16 -> 7.8 pt, legend 13 -> 6.4 pt (kept small on the author's
+request so the legend box takes little of the plot area). Guards (standard 12.7): every label and the legend box are checked
 against the canvas and every curve point against the legend box.
 
     python code/plot_results.py
@@ -42,14 +43,15 @@ os.makedirs(FIG, exist_ok=True)
 # Standard 9.3 / 9.8: every result figure shares one canvas (6.8 x 5.3 in) and
 # one axes box of 5.68 x 4.24 in (8:6), included at 0.95 columnwidth (239 pt),
 # so the print scale is 239 / (6.8 * 72) = 0.49 and the authored 15.5 pt
-# fonts print at 7.6 pt (ticks, legend) and 16 pt labels at 7.8 pt. The
-# legend sits inside the axes (author's request) with y-axis headroom.
+# fonts print at 7.6 pt (ticks), 16 pt labels at 7.8 pt, and the 13 pt
+# legend at 6.4 pt. The legend sits inside the axes (author's request, kept
+# small so it takes little of the plot area) with y-axis headroom.
 TW, TH = 6.8, 5.3
 plt.rcParams.update({
-    "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 15.5,
+    "font.size": 15.5, "axes.labelsize": 16.0, "legend.fontsize": 13.0,
     "lines.markersize": 7.0, "lines.linewidth": 1.8,
     "pdf.fonttype": 42, "figure.figsize": (TW, TH), "mathtext.fontset": "cm",
-    "legend.labelspacing": 0.25, "legend.handlelength": 1.6,
+    "legend.labelspacing": 0.2, "legend.handlelength": 1.4,
     "legend.handletextpad": 0.4, "legend.borderpad": 0.3,
     "legend.borderaxespad": 0.3, "legend.framealpha": 0.9,
 })
