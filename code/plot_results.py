@@ -67,7 +67,7 @@ LBL = {
     "masking_var": "Learned masks",
     "masking_var8": "Learned masks, $N{=}8$",
     "oma_static": "Static OMA",
-    "wh_dynamic": "WH masks, dynamic",
+    "wh_dynamic": "WH masks, per-rate heads",
     "deepma": "DeepMA, $N{=}K$",
     "deepma_offload": "DeepMA, off-load",
     "todma": "Token signatures",
