@@ -1,9 +1,8 @@
 # Progressive-Spread Multiple Access — Reproducibility Package
 
 Code, raw results, and figures for the manuscript *"Progressive-Spread
-Multiple Access: One Load-Adaptive Transceiver for Multi-User Semantic
-Communications"* (submitted to IEEE Transactions on Wireless Communications,
-September 2026).
+Multiple Access for Load-Adaptive Semantic Communications"* (submitted to
+IEEE Transactions on Wireless Communications, September 2026).
 
 One shared Swin JSCC encoder emits an importance-ordered symbol vector per
 token; at load K the j-th active user transmits the prefix
