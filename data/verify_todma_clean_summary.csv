@@ -1,0 +1,5 @@
+protocol,n_images,mean_psnr_db,std_psnr_db,se_psnr_db
+user0_200,200,24.5854,2.1097,0.1492
+all_users_1600,1600,24.6902,2.2442,0.0561
+trainlog_4x64,256,25.8716,2.1799,0.1362
+trainlog_4x64_st,256,25.8716,2.1799,0.1362

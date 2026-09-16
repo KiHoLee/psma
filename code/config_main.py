@@ -27,11 +27,11 @@ MAIN = {
     # --- shared frame -------------------------------------------------------
     "L": 8,                       # transmitted real dimensions per token
     "BETA": 1,                    # expansion factor of the main chain; l_s = L // BETA
-    "L_RICH": 32,                 # dimension-rich variant of Section VI-B
+    "L_RICH": 32,                 # dimension-rich variant (mask-era experiment, removed from the paper 2026-09-04; kept for data/tsp_eval2_raw.csv)
     "RICH_L_S": 16,               # ... trained as l_s=16 with RICH_BETA=2
     "RICH_BETA": 2,
     "STAGES": 2,                  # Swin stages -> token is 4x4 pixels
-    "DIMS": (96, 192),            # Swin stage widths, printed in Table IV
+    "DIMS": (96, 192),            # Swin stage widths, printed in Table V
     "CHANNEL": "rayleigh",        # Rayleigh block fading with perfect-CSI ZF
 
     # --- population ---------------------------------------------------------
@@ -49,7 +49,7 @@ MAIN = {
     "BATCH": 24,                  # per user
     "LR": 3e-4,
     "WEIGHT_DECAY": 1e-4,         # AdamW decoupled decay
-    "GRAD_CLIP": 1.0,             # global-norm clipping, disclosed in Table IV
+    "GRAD_CLIP": 1.0,             # global-norm clipping, disclosed in Table V
     "SNR_TRAIN": (0.0, 20.0),     # dB, uniform
 
     # --- evaluation ---------------------------------------------------------
@@ -152,10 +152,10 @@ def snr_grid_step():
     return steps.pop()
 
 
-#: Values that Table IV of the manuscript prints. `check_texhealth.py` asserts
+#: Values that Table V of the manuscript prints. `check_texhealth.py` asserts
 #: that each string below still occurs in main.tex, so a configuration change
 #: fails the pre-build gate instead of drifting into a stale table.
-def table_iv_expectations():
+def table_v_expectations():
     L = MAIN["L"]
     den = int(round(1.0 / cbr(L)))
     return {
@@ -182,5 +182,5 @@ if __name__ == "__main__":
         print("L=%d (l_s=%d, beta=%d)  CBR=1/%d  token=%dx%d px (%d values)"
               % (L, s, b, int(round(1 / cbr(L))), TOKEN_PX, TOKEN_PX, TOKEN_VALUES))
     print("N=%r  B at N=%d is %d" % (MAIN["N"], MAIN["N"][0], block()))
-    for k, v in sorted(table_iv_expectations().items()):
-        print("  Table IV | %-28s %s" % (k, v))
+    for k, v in sorted(table_v_expectations().items()):
+        print("  Table V | %-28s %s" % (k, v))

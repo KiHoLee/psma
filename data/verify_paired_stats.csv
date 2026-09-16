@@ -1,0 +1,66 @@
+kind,scheme,reference,K,n,mean,se,se_by_image,diff,se_diff,t,df,p,diff_by_image_se,t_by_image,p_by_image,note
+level,psma,,1,1000,23.8661,0.0937,0.1733,,,,,,,,,200 image-user slots
+level,masking_var,,1,1000,21.7542,0.0734,0.1449,,,,,,,,,200 image-user slots
+level,oma_static,,1,1000,21.4674,0.0873,0.1492,,,,,,,,,200 image-user slots
+level,oma_static_k,,1,1000,21.4541,0.0874,0.1515,,,,,,,,,200 image-user slots
+level,deepma_offload,,1,1000,16.6770,0.0488,0.1058,,,,,,,,,200 image-user slots
+paired,psma,masking_var,1,1000,,,,2.1120,0.0340,62.20,999,0,0.0607,34.81,1.41e-86,"same image, same fading draw, same user slot"
+paired,psma,oma_static_k,1,1000,,,,2.4120,0.0214,112.63,999,0,0.0414,58.24,5.74e-127,"same image, same fading draw, same user slot"
+unpaired,psma,oma_static,1,1000/1000,,,,2.3987,0.1281,18.73,1988,3.33e-72,,,,"Welch: oma_static row is the K=4 measurement (K=4 seeds), not the load-K draws"
+paired,psma,deepma_offload,1,1000,,,,7.1892,0.0917,78.37,999,0,0.1782,40.34,9.74e-98,"same image, same fading draw, same user slot"
+level,psma,,2,2000,22.7643,0.0661,0.1162,,,,,,,,,400 image-user slots
+level,masking_var,,2,2000,21.3433,0.0568,0.1067,,,,,,,,,400 image-user slots
+level,oma_static,,2,2000,21.5057,0.0630,0.1065,,,,,,,,,400 image-user slots
+level,oma_static_k,,2,2000,21.4381,0.0621,0.1080,,,,,,,,,400 image-user slots
+level,deepma_offload,,2,2000,17.9722,0.0428,0.0887,,,,,,,,,400 image-user slots
+paired,psma,masking_var,2,2000,,,,1.4209,0.0201,70.75,1999,0,0.0359,39.55,3.95e-140,"same image, same fading draw, same user slot"
+paired,psma,oma_static_k,2,2000,,,,1.3262,0.0107,123.63,1999,0,0.0202,65.64,6.09e-216,"same image, same fading draw, same user slot"
+unpaired,psma,oma_static,2,2000/2000,,,,1.2585,0.0913,13.78,3989,3e-42,,,,"Welch: oma_static row is the K=4 measurement (K=4 seeds), not the load-K draws"
+paired,psma,deepma_offload,2,2000,,,,4.7921,0.0586,81.83,1999,0,0.1141,41.99,1.67e-148,"same image, same fading draw, same user slot"
+level,psma,,3,3000,21.5674,0.0517,0.0936,,,,,,,,,600 image-user slots
+level,masking_var,,3,3000,20.9521,0.0478,0.0885,,,,,,,,,600 image-user slots
+level,oma_static,,3,3000,21.4972,0.0519,0.0885,,,,,,,,,600 image-user slots
+level,oma_static_k,,3,3000,21.5300,0.0512,0.0914,,,,,,,,,600 image-user slots
+level,deepma_offload,,3,3000,20.5457,0.0396,0.0720,,,,,,,,,600 image-user slots
+paired,psma,masking_var,3,3000,,,,0.6153,0.0128,47.93,2999,0,0.0253,24.29,3.01e-91,"same image, same fading draw, same user slot"
+paired,psma,oma_static_k,3,3000,,,,0.0374,0.0140,2.68,2999,0.00744,0.0288,1.30,0.194,"same image, same fading draw, same user slot"
+unpaired,psma,oma_static,3,3000/3000,,,,0.0702,0.0733,0.96,5998,0.338,,,,"Welch: oma_static row is the K=4 measurement (K=4 seeds), not the load-K draws"
+paired,psma,deepma_offload,3,3000,,,,1.0217,0.0251,40.77,2999,1.57e-289,0.0508,20.11,4.02e-69,"same image, same fading draw, same user slot"
+level,psma,,4,4000,20.7456,0.0435,0.0770,,,,,,,,,800 image-user slots
+level,masking_var,,4,4000,20.4119,0.0415,0.0725,,,,,,,,,800 image-user slots
+level,oma_static,,4,4000,21.5412,0.0454,0.0778,,,,,,,,,800 image-user slots
+level,oma_static_k,,4,4000,21.5412,0.0454,0.0778,,,,,,,,,800 image-user slots
+level,deepma_offload,,4,4000,21.3137,0.0435,0.0757,,,,,,,,,800 image-user slots
+paired,psma,masking_var,4,4000,,,,0.3336,0.0066,50.49,3999,0,0.0124,26.84,1.26e-113,"same image, same fading draw, same user slot"
+paired,psma,oma_static_k,4,4000,,,,-0.7957,0.0112,-71.29,3999,0,0.0223,-35.66,2.19e-167,"same image, same fading draw, same user slot"
+paired,psma,oma_static,4,4000,,,,-0.7957,0.0112,-71.29,3999,0,0.0223,-35.66,2.19e-167,"same image, same fading draw, same user slot"
+paired,psma,deepma_offload,4,4000,,,,-0.5681,0.0090,-62.94,3999,0,0.0181,-31.45,6.45e-142,"same image, same fading draw, same user slot"
+throughput_se,masking_var,,1,1000,0.3350,0.0149,0.0334,,,,,,,,,"designed N=8, SER=0.6650; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,2,1000,0.5890,0.0204,0.0456,,,,,,,,,"designed N=8, SER=0.7055; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,3,1000,0.9099,0.0252,0.0563,,,,,,,,,"designed N=8, SER=0.6967; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,4,1000,1.1080,0.0283,0.0633,,,,,,,,,"designed N=8, SER=0.7230; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,5,1000,1.2970,0.0310,0.0693,,,,,,,,,"designed N=8, SER=0.7406; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,6,1000,1.5018,0.0336,0.0750,,,,,,,,,"designed N=8, SER=0.7497; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,7,1000,1.6611,0.0356,0.0796,,,,,,,,,"designed N=8, SER=0.7627; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,8,1000,1.7968,0.0373,0.0835,,,,,,,,,"designed N=8, SER=0.7754; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,masking_var,,4,1000,1.9632,0.0316,0.0707,,,,,,,,,"designed N=4, SER=0.5092; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,oma_static,,4,1000,2.4960,0.0306,0.0685,,,,,,,,,"designed N=4, SER=0.3760; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,4,1000,2.4672,0.0307,0.0688,,,,,,,,,"designed N=4, SER=0.3832; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,1,1000,0.2540,0.0138,0.0308,,,,,,,,,"designed N=8, SER=0.7460; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,2,1000,0.6640,0.0211,0.0471,,,,,,,,,"designed N=8, SER=0.6680; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,3,1000,1.1889,0.0268,0.0599,,,,,,,,,"designed N=8, SER=0.6037; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,4,1000,1.5880,0.0309,0.0692,,,,,,,,,"designed N=8, SER=0.6030; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,5,1000,1.9680,0.0345,0.0772,,,,,,,,,"designed N=8, SER=0.6064; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,6,1000,2.3610,0.0378,0.0846,,,,,,,,,"designed N=8, SER=0.6065; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,7,1000,2.7020,0.0407,0.0911,,,,,,,,,"designed N=8, SER=0.6140; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,deepma_offload,,8,1000,3.0536,0.0435,0.0972,,,,,,,,,"designed N=8, SER=0.6183; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,todma,,4,1000,0.4548,0.0201,0.0449,,,,,,,,,"designed N=4, SER=0.8863; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,4,1000,2.1320,0.0316,0.0706,,,,,,,,,"designed N=4, SER=0.4670; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,1,1000,0.8060,0.0125,0.0280,,,,,,,,,"designed N=8, SER=0.1940; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,2,1000,1.3660,0.0208,0.0465,,,,,,,,,"designed N=8, SER=0.3170; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,3,1000,1.7661,0.0270,0.0603,,,,,,,,,"designed N=8, SER=0.4113; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,4,1000,1.9868,0.0316,0.0707,,,,,,,,,"designed N=8, SER=0.5033; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,5,1000,2.2010,0.0351,0.0785,,,,,,,,,"designed N=8, SER=0.5598; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,6,1000,2.5038,0.0382,0.0854,,,,,,,,,"designed N=8, SER=0.5827; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,7,1000,2.7097,0.0408,0.0911,,,,,,,,,"designed N=8, SER=0.6129; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
+throughput_se,psma,,8,1000,2.8344,0.0428,0.0957,,,,,,,,,"designed N=8, SER=0.6457; se column = sqrt(K*SER*(1-SER)/1000), se_by_image column = sqrt(K*SER*(1-SER)/200)"
